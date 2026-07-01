@@ -60,7 +60,7 @@
             {/if}
           </td>
           <td class="font-mono-data px-4 py-3 text-surface-300">
-            {user.quota_pages_used}/{user.quota_pages_limit} pages
+            {user.quota_pages_used}/{user.quota_pages_limit} units
           </td>
           <td class="font-mono-data px-4 py-3 text-surface-300">{user.job_count}</td>
           <td class="font-mono-data px-4 py-3 text-surface-400">{user.created_at}</td>

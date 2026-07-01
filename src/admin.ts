@@ -76,7 +76,7 @@ interface JobListRow {
   title: string | null;
   status: string;
   error: string | null;
-  pdf_key: string;
+  file_key: string;
   created_at: string;
 }
 
@@ -85,7 +85,7 @@ const JOB_LIST_LIMIT = 200;
 admin.get("/admin/api/jobs", async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT jobs.id, users.email as user_email, jobs.title, jobs.status, jobs.error,
-            jobs.pdf_key, jobs.created_at
+            jobs.file_key, jobs.created_at
      FROM jobs JOIN users ON users.id = jobs.user_id
      ORDER BY jobs.created_at DESC
      LIMIT ?`,
@@ -97,7 +97,7 @@ admin.get("/admin/api/jobs", async (c) => {
     results.map(async (job) => {
       const keys = jobKeys(job.id);
       const [hasPdf, hasResponse, hasDocument, hasDocx] = await Promise.all([
-        exists(c.env.BUCKET, job.pdf_key),
+        exists(c.env.BUCKET, job.file_key),
         exists(c.env.BUCKET, keys.mistralResponse),
         exists(c.env.BUCKET, keys.document),
         exists(c.env.BUCKET, keys.docx),
@@ -118,7 +118,7 @@ admin.get("/admin/api/jobs", async (c) => {
 });
 
 async function requireJobRow(c: { env: Env }, jobId: string): Promise<(JobForBuild & { id: string; user_id: string }) | null> {
-  return c.env.DB.prepare("SELECT id, user_id, sha256, pdf_key, title FROM jobs WHERE id = ?")
+  return c.env.DB.prepare("SELECT id, user_id, sha256, file_key, title, modality FROM jobs WHERE id = ?")
     .bind(jobId)
     .first<JobForBuild & { id: string; user_id: string }>();
 }
@@ -137,7 +137,9 @@ admin.get("/admin/jobs/:id/pdf", async (c) => {
   const jobId = c.req.param("id");
   const row = await requireJobRow(c, jobId);
   if (!row) return c.text("job not found", 404);
-  return download(await c.env.BUCKET.get(row.pdf_key), "application/pdf", `${jobId}.pdf`);
+  const extension = row.file_key.split(".").pop() || "bin";
+  const contentType = row.modality === "audio" ? "application/octet-stream" : "application/pdf";
+  return download(await c.env.BUCKET.get(row.file_key), contentType, `${jobId}.${extension}`);
 });
 
 admin.get("/admin/jobs/:id/mistral-response", async (c) => {
@@ -198,25 +200,26 @@ admin.post("/admin/api/jobs/:id/reproduce-document", async (c) => {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   );
 
+  const usageKind = row.modality === "audio" ? "asr_minutes" : "ocr_pages";
   const alreadyCharged = await c.env.DB.prepare(
-    "SELECT 1 FROM usage_events WHERE job_id = ? AND kind = 'ocr_pages'",
+    "SELECT 1 FROM usage_events WHERE job_id = ? AND kind = ?",
   )
-    .bind(jobId)
+    .bind(jobId, usageKind)
     .first();
 
   const statements = [
     c.env.DB.prepare(
-      `UPDATE jobs SET status = 'done', error = NULL, mistral_pages_processed = ?, updated_at = datetime('now') WHERE id = ?`,
-    ).bind(build.pagesProcessed, jobId),
+      `UPDATE jobs SET status = 'done', error = NULL, mistral_units_processed = ?, updated_at = datetime('now') WHERE id = ?`,
+    ).bind(build.unitsProcessed, jobId),
   ];
   if (!alreadyCharged) {
     statements.push(
       c.env.DB.prepare(
-        `INSERT INTO usage_events (id, user_id, job_id, kind, quantity) SELECT lower(hex(randomblob(16))), user_id, ?, 'ocr_pages', ? FROM jobs WHERE id = ?`,
-      ).bind(jobId, build.pagesProcessed, jobId),
+        `INSERT INTO usage_events (id, user_id, job_id, kind, quantity) SELECT lower(hex(randomblob(16))), user_id, ?, ?, ? FROM jobs WHERE id = ?`,
+      ).bind(jobId, usageKind, build.unitsProcessed, jobId),
       c.env.DB.prepare(
         `UPDATE users SET quota_pages_used = quota_pages_used + ? WHERE id = (SELECT user_id FROM jobs WHERE id = ?)`,
-      ).bind(build.pagesProcessed, jobId),
+      ).bind(build.unitsProcessed, jobId),
     );
   }
   await c.env.DB.batch(statements as Parameters<typeof c.env.DB.batch>[0]);

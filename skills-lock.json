@@ -7,6 +7,12 @@
       "skillPath": "skills/cloudflare/SKILL.md",
       "computedHash": "a1646a6a2fb7cc683de5bf8357e5d6ae02db6fd0bf771d633c1890318e25bff2"
     },
+    "ux-writing-arabic": {
+      "source": "itady74/ux-writing-arabic",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "6b67dc2ca3e5ec55af843edb881dd30a594340901e627f3cc3704cf2efe55980"
+    },
     "wrangler": {
       "source": "cloudflare/skills",
       "sourceType": "github",

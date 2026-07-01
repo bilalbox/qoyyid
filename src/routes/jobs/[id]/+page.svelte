@@ -49,9 +49,9 @@
       </div>
     </div>
     <div class="flex items-center justify-between p-4">
-      <span class="text-sm text-surface-400">Pages</span>
+      <span class="text-sm text-surface-400">Units</span>
       <span class="font-mono-data text-sm text-surface-100">
-        {job.mistral_pages_processed ?? job.total_pages}
+        {job.mistral_units_processed ?? job.source_units}
       </span>
     </div>
     {#if job.error}

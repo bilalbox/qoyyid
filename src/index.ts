@@ -5,7 +5,15 @@ import type { Env } from "./types";
 import { json } from "./http";
 import { auth } from "./auth";
 import { admin } from "./admin";
-import { handleCreateJob, handleGetDocument, handleGetDocx, handleGetJob, handleListJobs } from "./jobs";
+import {
+  handleCreateAudioUpload,
+  handleCreateJob,
+  handleGetDocument,
+  handleGetDocx,
+  handleGetJob,
+  handleListJobs,
+  handleStartAudioJob,
+} from "./jobs";
 import { validateSessionToken } from "./users";
 import type { Session, User } from "./users";
 import { pollPendingBatches } from "./cron";
@@ -74,6 +82,8 @@ app.delete("/me/fcm-token", async (c) => {
 });
 
 app.post("/jobs", (c) => handleCreateJob(c.req.raw, c.env, c.executionCtx, c.get("user")));
+app.post("/jobs/audio-upload", (c) => handleCreateAudioUpload(c.req.raw, c.env, c.get("user")));
+app.post("/jobs/:id/start-audio", (c) => handleStartAudioJob(c.env, c.executionCtx, c.get("user"), c.req.param("id")));
 app.get("/jobs", (c) => handleListJobs(c.env, c.get("user")));
 app.get("/jobs/:id", (c) => handleGetJob(c.env, c.get("user"), c.req.param("id")));
 app.get("/jobs/:id/docx", (c) => handleGetDocx(c.env, c.get("user"), c.req.param("id")));

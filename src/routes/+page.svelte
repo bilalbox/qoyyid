@@ -71,20 +71,20 @@
 
 <div class="mx-auto max-w-3xl space-y-10 px-6 py-10">
   <section>
-    <h2 class="font-heading text-xl font-bold text-primary-300">Upload a manuscript</h2>
+    <h2 class="font-heading text-xl font-bold text-primary-300">Upload a manuscript or audio</h2>
     <form onsubmit={onUpload} class="mt-3">
       <label
         class="flex cursor-pointer flex-col items-center gap-1 rounded-container border-2 border-dashed border-surface-700 bg-surface-900/60 px-6 py-10 text-center transition-colors hover:border-primary-500 hover:bg-surface-900"
       >
         <span class="font-medium text-surface-100">
-          {fileName ?? "Drop a PDF here, or click to browse"}
+          {fileName ?? "Drop a PDF or Audio file here, or click to browse"}
         </span>
         <span class="text-sm text-surface-400">
-          Scanned pages only — OCR reads the images, not embedded text.
+          Scanned PDF pages or Audio files (mp3, wav, m4a, flac).
         </span>
         <input
           type="file"
-          accept="application/pdf"
+          accept="application/pdf,audio/mpeg,audio/wav,audio/x-m4a,audio/mp4,audio/flac"
           class="sr-only"
           bind:this={fileInput}
           onchange={onFileChange}
@@ -92,7 +92,7 @@
         />
       </label>
       <button type="submit" class="btn preset-filled-primary-500 mt-4" disabled={uploading}>
-        {uploading ? "Uploading…" : "Upload PDF"}
+        {uploading ? "Uploading…" : "Upload"}
       </button>
     </form>
     {#if uploadError}
@@ -127,7 +127,7 @@
                   </p>
                 </a>
                 <p class="font-mono-data mt-1 text-sm text-surface-400">
-                  {job.mistral_pages_processed ?? job.total_pages} pages · updated {updatedAgo(
+                  {job.mistral_units_processed ?? job.source_units} units · updated {updatedAgo(
                     job.updated_at,
                   )}
                 </p>

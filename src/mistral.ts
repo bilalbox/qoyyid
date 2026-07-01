@@ -1,4 +1,5 @@
 import type { Env } from "./types";
+import { generatePresignedGetUrl } from "./presign";
 
 /**
  * Worker-internal Mistral API client. MISTRAL_API_KEY is injected here and
@@ -8,6 +9,7 @@ import type { Env } from "./types";
 
 const MISTRAL_API = "https://api.mistral.ai/v1";
 const OCR_MODEL = "mistral-ocr-latest";
+const AUDIO_MODEL = "voxtral-mini-latest";
 
 function authHeaders(env: Env): Record<string, string> {
   return { Authorization: `Bearer ${env.MISTRAL_API_KEY}` };
@@ -74,6 +76,38 @@ export async function submitBatchOcrJob(env: Env, jobId: string, pdfFileId: stri
   return job.id;
 }
 
+
+export async function submitBatchAudioJob(env: Env, jobId: string, fileKey: string): Promise<string> {
+  const fileUrl = await generatePresignedGetUrl(env, fileKey);
+  const batchLine = {
+    custom_id: jobId,
+    body: {
+      model: AUDIO_MODEL,
+      file_url: fileUrl,
+      diarize: true,
+    },
+  };
+  const jsonl = `${JSON.stringify(batchLine)}\n`;
+  const jsonlFileId = await uploadFileToMistral(
+    env,
+    new TextEncoder().encode(jsonl).buffer as ArrayBuffer,
+    `${jobId}.jsonl`,
+    "batch",
+  );
+
+  const job = await mistralJson<{ id: string }>(env, "/batch/jobs", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      input_files: [jsonlFileId],
+      model: AUDIO_MODEL,
+      endpoint: "/v1/audio/transcriptions",
+      timeout_hours: 24,
+    }),
+  });
+  return job.id;
+}
+
 export interface MistralBatchJobStatus {
   id: string;
   status: "QUEUED" | "RUNNING" | "SUCCESS" | "FAILED" | "CANCELLED" | string;
@@ -99,10 +133,19 @@ export interface MistralOcrPage {
 
 export interface MistralBatchResultLine {
   custom_id: string;
-  response?: { body?: { pages?: MistralOcrPage[] } };
+  response?: {
+    body?: {
+      pages?: MistralOcrPage[];
+      text?: string;
+      // Per Mistral's documented /v1/audio/transcriptions response schema
+      // (https://docs.mistral.ai/api/endpoint/audio/transcriptions) — not yet
+      // confirmed against a real completed batch job the way the OCR fields
+      // above are. Verify this shape survives once a real audio batch finishes.
+      usage?: { prompt_audio_seconds?: number };
+    };
+  };
   error?: unknown;
 }
-
 /**
  * Downloads and parses the batch output JSONL. Confirmed against a real
  * completed batch job (2026-07-01): the endpoint path below is correct.

@@ -15,6 +15,6 @@ export function jobKeys(jobId: string) {
   };
 }
 
-export function uploadPdfKey(sha256: string): string {
-  return `uploads/${sha256}.pdf`;
+export function uploadFileKey(sha256: string, extension: string = "pdf"): string {
+  return `uploads/${sha256}.${extension}`;
 }

@@ -4,22 +4,24 @@ import { putBytes, putJson } from "./r2";
 import { normalizeDocument } from "./normalize";
 import { documentToDocxBuffer } from "./docx-export";
 import { fetchBatchResult, type MistralBatchJobStatus, type MistralBatchResultLine } from "./mistral";
-import { mapMistralPageToQoyyidPage, stripRunningHeaders } from "./mistral-mapping";
+import { mapMistralPageToQoyyidPage, mapMistralAudioToQoyyidPage, stripRunningHeaders } from "./mistral-mapping";
 import { notifyUser } from "./fcm";
 
 interface JobForMerge {
   id: string;
   user_id: string;
   sha256: string;
-  pdf_key: string;
+  file_key: string;
   title: string | null;
   mistral_batch_job_id: string | null;
+  modality: "pdf" | "audio";
 }
 
 export interface JobForBuild {
-  pdf_key: string;
+  file_key: string;
   sha256: string;
   title: string | null;
+  modality: "pdf" | "audio";
 }
 
 /**
@@ -32,30 +34,48 @@ export async function buildDocumentAndDocx(
   job: JobForBuild,
   jobId: string,
   resultLine: MistralBatchResultLine,
-): Promise<{ doc: Document; docx: Uint8Array; pagesProcessed: number }> {
-  const mistralPages = resultLine.response?.body?.pages;
-  if (!mistralPages || mistralPages.length === 0) {
-    throw new Error(`no OCR result for job ${jobId} in batch output`);
+): Promise<{ doc: Document; docx: Uint8Array; unitsProcessed: number }> {
+  let pages: any[] = [];
+  let unitsProcessed = 0;
+
+  if (job.modality === "audio") {
+    const text = resultLine.response?.body?.text;
+    if (!text) {
+      throw new Error(`no audio transcript for job ${jobId} in batch output`);
+    }
+    const mapped = mapMistralAudioToQoyyidPage(text);
+    pages = [mapped.page];
+    // asr_minutes usage is billed on wall-clock audio duration, from Mistral's
+    // own usage.prompt_audio_seconds — never trust client-supplied duration.
+    // Round up to the nearest minute, minimum 1, matching per-minute billing.
+    const seconds = resultLine.response?.body?.usage?.prompt_audio_seconds;
+    unitsProcessed = seconds ? Math.max(1, Math.ceil(seconds / 60)) : 1;
+  } else {
+    const mistralPages = resultLine.response?.body?.pages;
+    if (!mistralPages || mistralPages.length === 0) {
+      throw new Error(`no OCR result for job ${jobId} in batch output`);
+    }
+
+    const mapped = mistralPages.map(mapMistralPageToQoyyidPage);
+    stripRunningHeaders(mapped);
+    pages = mapped.map((m) => m.page);
+    unitsProcessed = pages.length;
   }
 
-  const mapped = mistralPages.map(mapMistralPageToQoyyidPage);
-  stripRunningHeaders(mapped);
-  const pages = mapped.map((m) => m.page);
-
   const doc: Document = {
-    source: { input: job.pdf_key, sha256: job.sha256, modality: "pdf" },
+    source: { input: job.file_key, sha256: job.sha256, modality: job.modality },
     metadata: {
       title: job.title,
       page_count: pages.length,
       languages: ["ar"],
-      engines_used: ["mistral-ocr-latest", "cloud-orchestrator"],
+      engines_used: job.modality === "audio" ? ["voxtral-mini-latest", "cloud-orchestrator"] : ["mistral-ocr-latest", "cloud-orchestrator"],
     },
     pages,
   };
 
   normalizeDocument(doc);
   const docx = await documentToDocxBuffer(doc);
-  return { doc, docx, pagesProcessed: pages.length };
+  return { doc, docx, unitsProcessed };
 }
 
 /**
@@ -78,7 +98,7 @@ export async function finalizeJob(env: Env, jobId: string, batchStatus: MistralB
   if (claimed.meta.changes === 0) return;
 
   const row = await env.DB.prepare(
-    "SELECT id, user_id, sha256, pdf_key, title, mistral_batch_job_id FROM jobs WHERE id = ?",
+    "SELECT id, user_id, sha256, file_key, title, mistral_batch_job_id, modality FROM jobs WHERE id = ?",
   )
     .bind(jobId)
     .first<JobForMerge>();
@@ -103,19 +123,21 @@ export async function finalizeJob(env: Env, jobId: string, batchStatus: MistralB
     const keys = jobKeys(jobId);
     await putJson(env.BUCKET, keys.mistralResponse, resultLine);
 
-    const { doc, docx, pagesProcessed } = await buildDocumentAndDocx(row, jobId, resultLine);
+    const { doc, docx, unitsProcessed } = await buildDocumentAndDocx(row, jobId, resultLine);
     await putJson(env.BUCKET, keys.document, doc);
     await putBytes(env.BUCKET, keys.docx, docx, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
 
+    const usageKind = row.modality === "audio" ? "asr_minutes" : "ocr_pages";
+
     await env.DB.batch([
       env.DB.prepare(
-        `UPDATE jobs SET status = 'done', error = NULL, mistral_pages_processed = ?, updated_at = datetime('now') WHERE id = ?`,
-      ).bind(pagesProcessed, jobId),
+        `UPDATE jobs SET status = 'done', error = NULL, mistral_units_processed = ?, updated_at = datetime('now') WHERE id = ?`,
+      ).bind(unitsProcessed, jobId),
       env.DB.prepare(
-        `INSERT INTO usage_events (id, user_id, job_id, kind, quantity) SELECT lower(hex(randomblob(16))), user_id, ?, 'ocr_pages', ? FROM jobs WHERE id = ?`,
-      ).bind(jobId, pagesProcessed, jobId),
+        `INSERT INTO usage_events (id, user_id, job_id, kind, quantity) SELECT lower(hex(randomblob(16))), user_id, ?, ?, ? FROM jobs WHERE id = ?`,
+      ).bind(jobId, usageKind, unitsProcessed, jobId),
       env.DB.prepare(`UPDATE users SET quota_pages_used = quota_pages_used + ? WHERE id = (SELECT user_id FROM jobs WHERE id = ?)`).bind(
-        pagesProcessed,
+        unitsProcessed,
         jobId,
       ),
     ]);

@@ -41,7 +41,7 @@
           </a>
         {/if}
         <span class="badge preset-tonal-primary font-mono-data text-xs">
-          {data.me.quota_pages_used}/{data.me.quota_pages_limit} pages
+          {data.me.quota_pages_used}/{data.me.quota_pages_limit} units
         </span>
         <button
           onclick={signOut}

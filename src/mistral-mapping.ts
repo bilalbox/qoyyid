@@ -159,39 +159,52 @@ export interface MappedPage {
   headerCandidates: HeaderCandidate[];
 }
 
-export function mapMistralPageToQoyyidPage(mistralPage: MistralOcrPage): MappedPage {
-  const pageW = mistralPage.dimensions?.width ?? 0;
-  const pageH = mistralPage.dimensions?.height ?? 0;
-  const raw = splitMarkdownParagraphs(mistralPage.markdown ?? "");
-
+function buildBlocks(raw: string[]): Block[] {
   const blocks: Block[] = [];
+  let order = 0;
+  for (const text of raw) {
+    const classified = classifyMarkdownParagraph(text);
+    if (!classified) continue;
+    blocks.push({
+      type: classified.type,
+      reading_order: order++,
+      bbox: null,
+      level: classified.level,
+      lines: [{ text: classified.text }],
+    });
+  }
+  return blocks;
+}
+
+// Only consider the first couple of paragraphs on the page — a running
+// header lives at the very top, never mid-body.
+function findHeaderCandidates(raw: string[], pageIndex: number): HeaderCandidate[] {
   const headerCandidates: HeaderCandidate[] = [];
   let order = 0;
-
   for (let i = 0; i < raw.length; i++) {
     const text = raw[i];
     const classified = classifyMarkdownParagraph(text);
     if (!classified) continue;
 
     const readingOrder = order++;
-    blocks.push({
-      type: classified.type,
-      reading_order: readingOrder,
-      bbox: null,
-      level: classified.level,
-      lines: [{ text: classified.text }],
-    });
-
-    // Only consider the first couple of paragraphs on the page — a running
-    // header lives at the very top, never mid-body.
     if (classified.type === "body" && i <= 1 && isHeaderCandidateText(text)) {
       const prevIsPageNum = i > 0 && PAGE_NUMBER_ONLY_RE.test(raw[i - 1]);
       const nextIsPageNum = i + 1 < raw.length && PAGE_NUMBER_ONLY_RE.test(raw[i + 1]);
       if (prevIsPageNum || nextIsPageNum) {
-        headerCandidates.push({ pageIndex: mistralPage.index, readingOrder, text: text.trim() });
+        headerCandidates.push({ pageIndex, readingOrder, text: text.trim() });
       }
     }
   }
+  return headerCandidates;
+}
+
+export function mapMistralPageToQoyyidPage(mistralPage: MistralOcrPage): MappedPage {
+  const pageW = mistralPage.dimensions?.width ?? 0;
+  const pageH = mistralPage.dimensions?.height ?? 0;
+  const raw = splitMarkdownParagraphs(mistralPage.markdown ?? "");
+
+  const blocks = buildBlocks(raw);
+  const headerCandidates = findHeaderCandidates(raw, mistralPage.index);
 
   const page: Page = { index: mistralPage.index, width: pageW, height: pageH, blocks };
   promoteLexicalHeadings(page.blocks);
@@ -237,4 +250,13 @@ export function stripRunningHeaders(mapped: MappedPage[]): void {
     if (!drop) continue;
     page.blocks = page.blocks.filter((b) => !drop.has(b.reading_order ?? -1));
   }
+}
+
+export function mapMistralAudioToQoyyidPage(text: string): MappedPage {
+  const raw = splitMarkdownParagraphs(text);
+  const blocks = buildBlocks(raw);
+
+  const page: Page = { index: 0, width: 0, height: 0, blocks };
+  promoteLexicalHeadings(page.blocks);
+  return { page, headerCandidates: [] };
 }

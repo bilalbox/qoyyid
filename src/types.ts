@@ -67,18 +67,23 @@ export interface Env {
   ADMIN_EMAILS: string;
   TURNSTILE_SECRET_KEY: string;
   FCM_SERVICE_ACCOUNT_JSON: string;
+  CLOUDFLARE_ACCOUNT_ID: string;
+  R2_ACCESS_KEY_ID: string;
+  R2_SECRET_ACCESS_KEY: string;
+  R2_BUCKET_NAME: string;
 }
 
 export interface JobRow {
   id: string;
   user_id: string;
   sha256: string;
-  pdf_key: string;
+  file_key: string;
   status: string;
   title: string | null;
-  total_pages: number;
+  modality: "pdf" | "audio";
+  source_units: number;
   mistral_file_id: string | null;
   mistral_batch_job_id: string | null;
-  mistral_pages_processed: number | null;
+  mistral_units_processed: number | null;
   error: string | null;
 }
