@@ -60,6 +60,7 @@ export interface Document {
 export interface Env {
   BUCKET: R2Bucket;
   DB: D1Database;
+  ASSETS: Fetcher;
   MISTRAL_API_KEY: string;
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;

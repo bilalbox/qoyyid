@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Document, Env } from "./types";
 import type { Session, User } from "./users";
-import { jobKeys } from "./http";
+import { json, jobKeys } from "./http";
 import { exists, getJson, putBytes, putJson } from "./r2";
 import { buildDocumentAndDocx, type JobForBuild } from "./merge";
 import { documentToDocxBuffer } from "./docx-export";
@@ -10,19 +10,6 @@ import type { MistralBatchResultLine } from "./mistral";
 type Variables = { user: User; session: Session };
 
 export const admin = new Hono<{ Bindings: Env; Variables: Variables }>();
-
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
-}
-
-function page(title: string, body: string): string {
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>
-<style>body{font-family:system-ui,sans-serif;max-width:960px;margin:2rem auto;padding:0 1rem}
-table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:.4rem .6rem;text-align:left}
-form{display:inline}input{padding:.3rem}button{padding:.3rem .8rem}</style></head>
-<body><h1>${escapeHtml(title)}</h1><nav><a href="/admin/users">Users</a> | <a href="/admin/invites">Invites</a> | <a href="/admin/jobs">Jobs</a></nav>
-${body}</body></html>`;
-}
 
 interface UserRow {
   id: string;
@@ -36,7 +23,7 @@ interface UserRow {
   job_count: number;
 }
 
-admin.get("/admin/users", async (c) => {
+admin.get("/admin/api/users", async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT u.id, u.email, u.is_admin, u.quota_pages_limit, u.quota_pages_used,
             u.quota_minutes_limit, u.quota_minutes_used, u.created_at,
@@ -44,39 +31,22 @@ admin.get("/admin/users", async (c) => {
      FROM users u ORDER BY u.created_at DESC`,
   ).all<UserRow>();
 
-  const rows = results
-    .map(
-      (u) => `<tr>
-    <td>${escapeHtml(u.email)}</td>
-    <td>${u.is_admin ? "yes" : ""}</td>
-    <td>${u.quota_pages_used}/${u.quota_pages_limit} pages, ${u.quota_minutes_used}/${u.quota_minutes_limit} min</td>
-    <td>${u.job_count}</td>
-    <td>${escapeHtml(u.created_at)}</td>
-    <td><form method="post" action="/admin/users/${u.id}/quota">
-      <input type="number" name="quota_pages_limit" value="${u.quota_pages_limit}" style="width:5em">
-      <button type="submit">Set page quota</button>
-    </form></td>
-  </tr>`,
-    )
-    .join("\n");
-
-  return c.html(
-    page(
-      "Users",
-      `<table><tr><th>Email</th><th>Admin</th><th>Quota</th><th>Jobs</th><th>Joined</th><th>Actions</th></tr>${rows}</table>`,
-    ),
-  );
+  return json({
+    users: results.map((u) => ({ ...u, is_admin: Boolean(u.is_admin) })),
+  });
 });
 
-admin.post("/admin/users/:id/quota", async (c) => {
+admin.post("/admin/api/users/:id/quota", async (c) => {
   const id = c.req.param("id");
-  const form = await c.req.formData();
-  const limit = Number(form.get("quota_pages_limit"));
-  if (!Number.isFinite(limit) || limit < 0) {
-    return c.text("invalid quota", 400);
+  const body = await c.req.json<{ quota_pages_limit?: number }>().catch(() => ({}) as { quota_pages_limit?: number });
+  const quota_pages_limit = body.quota_pages_limit;
+  if (!Number.isFinite(quota_pages_limit) || (quota_pages_limit as number) < 0) {
+    return json({ error: "invalid quota" }, 400);
   }
-  await c.env.DB.prepare("UPDATE users SET quota_pages_limit = ? WHERE id = ?").bind(limit, id).run();
-  return c.redirect("/admin/users");
+  await c.env.DB.prepare("UPDATE users SET quota_pages_limit = ? WHERE id = ?")
+    .bind(quota_pages_limit, id)
+    .run();
+  return json({ success: true });
 });
 
 interface InviteRow {
@@ -85,30 +55,19 @@ interface InviteRow {
   used_at: string | null;
 }
 
-admin.get("/admin/invites", async (c) => {
-  const { results } = await c.env.DB.prepare("SELECT email, created_at, used_at FROM invites ORDER BY created_at DESC").all<InviteRow>();
-  const rows = results
-    .map((i) => `<tr><td>${escapeHtml(i.email)}</td><td>${escapeHtml(i.created_at)}</td><td>${i.used_at ? "used" : "pending"}</td></tr>`)
-    .join("\n");
-
-  return c.html(
-    page(
-      "Invites",
-      `<form method="post" action="/admin/invites">
-        <input type="email" name="email" placeholder="email@example.com" required>
-        <button type="submit">Create invite</button>
-      </form>
-      <table><tr><th>Email</th><th>Created</th><th>Status</th></tr>${rows}</table>`,
-    ),
-  );
+admin.get("/admin/api/invites", async (c) => {
+  const { results } = await c.env.DB.prepare(
+    "SELECT email, created_at, used_at FROM invites ORDER BY created_at DESC",
+  ).all<InviteRow>();
+  return json({ invites: results });
 });
 
-admin.post("/admin/invites", async (c) => {
-  const form = await c.req.formData();
-  const email = String(form.get("email") || "").trim().toLowerCase();
-  if (!email) return c.text("email required", 400);
+admin.post("/admin/api/invites", async (c) => {
+  const body = await c.req.json<{ email?: string }>().catch(() => ({}) as { email?: string });
+  const email = String(body.email || "").trim().toLowerCase();
+  if (!email) return json({ error: "email required" }, 400);
   await c.env.DB.prepare("INSERT OR IGNORE INTO invites (email) VALUES (?)").bind(email).run();
-  return c.redirect("/admin/invites");
+  return json({ success: true });
 });
 
 interface JobListRow {
@@ -123,7 +82,7 @@ interface JobListRow {
 
 const JOB_LIST_LIMIT = 200;
 
-admin.get("/admin/jobs", async (c) => {
+admin.get("/admin/api/jobs", async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT jobs.id, users.email as user_email, jobs.title, jobs.status, jobs.error,
             jobs.pdf_key, jobs.created_at
@@ -134,7 +93,7 @@ admin.get("/admin/jobs", async (c) => {
     .bind(JOB_LIST_LIMIT)
     .all<JobListRow>();
 
-  const rows = await Promise.all(
+  const jobs = await Promise.all(
     results.map(async (job) => {
       const keys = jobKeys(job.id);
       const [hasPdf, hasResponse, hasDocument, hasDocx] = await Promise.all([
@@ -143,42 +102,19 @@ admin.get("/admin/jobs", async (c) => {
         exists(c.env.BUCKET, keys.document),
         exists(c.env.BUCKET, keys.docx),
       ]);
-
-      const link = (available: boolean, href: string, label: string) =>
-        available ? `<a href="${href}">${label}</a>` : `<span class="text-muted">${label}</span>`;
-
-      const downloads = [
-        link(hasPdf, `/admin/jobs/${job.id}/pdf`, "pdf"),
-        link(hasResponse, `/admin/jobs/${job.id}/mistral-response`, "response"),
-        link(hasDocument, `/admin/jobs/${job.id}/document`, "document.json"),
-        link(hasDocx, `/admin/jobs/${job.id}/docx`, "docx"),
-      ].join(" · ");
-
-      const reproduceDocument = hasResponse
-        ? `<form method="post" action="/admin/jobs/${job.id}/reproduce-document"><button type="submit">Reproduce document.json</button></form>`
-        : `<button type="button" disabled title="no stored Mistral response for this job">Reproduce document.json</button>`;
-      const reproduceDocx = hasDocument
-        ? `<form method="post" action="/admin/jobs/${job.id}/reproduce-docx"><button type="submit">Reproduce docx</button></form>`
-        : `<button type="button" disabled title="no stored document.json for this job">Reproduce docx</button>`;
-
-      return `<tr>
-    <td>${escapeHtml(job.title ?? job.id.slice(0, 8))}</td>
-    <td>${escapeHtml(job.user_email)}</td>
-    <td>${escapeHtml(job.status)}${job.error ? ` <span class="text-muted" title="${escapeHtml(job.error)}">(error)</span>` : ""}</td>
-    <td>${escapeHtml(job.created_at)}</td>
-    <td>${downloads}</td>
-    <td>${reproduceDocument} ${reproduceDocx}</td>
-  </tr>`;
+      return {
+        id: job.id,
+        title: job.title,
+        user_email: job.user_email,
+        status: job.status,
+        error: job.error,
+        created_at: job.created_at,
+        available: { pdf: hasPdf, response: hasResponse, document: hasDocument, docx: hasDocx },
+      };
     }),
   );
 
-  return c.html(
-    page(
-      "Jobs",
-      `<style>.text-muted{color:#999}</style>
-      <table><tr><th>Title</th><th>User</th><th>Status</th><th>Created</th><th>Downloads</th><th>Actions</th></tr>${rows.join("\n")}</table>`,
-    ),
-  );
+  return json({ jobs });
 });
 
 async function requireJobRow(c: { env: Env }, jobId: string): Promise<(JobForBuild & { id: string; user_id: string }) | null> {
@@ -238,20 +174,20 @@ admin.get("/admin/jobs/:id/docx", async (c) => {
  * 'done'. Quota is only charged if this job never had a usage_events row —
  * a job already 'done' being reproduced isn't charged again.
  */
-admin.post("/admin/jobs/:id/reproduce-document", async (c) => {
+admin.post("/admin/api/jobs/:id/reproduce-document", async (c) => {
   const jobId = c.req.param("id");
   const row = await requireJobRow(c, jobId);
-  if (!row) return c.text("job not found", 404);
+  if (!row) return json({ error: "job not found" }, 404);
 
   const keys = jobKeys(jobId);
   const resultLine = await getJson<MistralBatchResultLine>(c.env.BUCKET, keys.mistralResponse);
-  if (!resultLine) return c.text("no stored Mistral response for this job — cannot reproduce", 409);
+  if (!resultLine) return json({ error: "no stored Mistral response for this job — cannot reproduce" }, 409);
 
   let build: Awaited<ReturnType<typeof buildDocumentAndDocx>>;
   try {
     build = await buildDocumentAndDocx(row, jobId, resultLine);
   } catch (e) {
-    return c.text(`reproduce failed: ${e instanceof Error ? e.message : String(e)}`, 500);
+    return json({ error: `reproduce failed: ${e instanceof Error ? e.message : String(e)}` }, 500);
   }
 
   await putJson(c.env.BUCKET, keys.document, build.doc);
@@ -285,7 +221,7 @@ admin.post("/admin/jobs/:id/reproduce-document", async (c) => {
   }
   await c.env.DB.batch(statements as Parameters<typeof c.env.DB.batch>[0]);
 
-  return c.redirect("/admin/jobs");
+  return json({ success: true });
 });
 
 /**
@@ -293,11 +229,11 @@ admin.post("/admin/jobs/:id/reproduce-document", async (c) => {
  * document.json — cheap, and works even for jobs whose Mistral response
  * wasn't captured (pre-dating this feature), as long as document.json exists.
  */
-admin.post("/admin/jobs/:id/reproduce-docx", async (c) => {
+admin.post("/admin/api/jobs/:id/reproduce-docx", async (c) => {
   const jobId = c.req.param("id");
   const keys = jobKeys(jobId);
   const doc = await getJson<Document>(c.env.BUCKET, keys.document);
-  if (!doc) return c.text("no stored document.json for this job — cannot reproduce docx", 409);
+  if (!doc) return json({ error: "no stored document.json for this job — cannot reproduce docx" }, 409);
 
   const docx = await documentToDocxBuffer(doc);
   await putBytes(
@@ -307,5 +243,5 @@ admin.post("/admin/jobs/:id/reproduce-docx", async (c) => {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   );
 
-  return c.redirect("/admin/jobs");
+  return json({ success: true });
 });

@@ -16,7 +16,7 @@ export function isTerminal(status: string): boolean {
   return TERMINAL_STATUSES.has(status);
 }
 
-async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   const res = await fetch(path, init);
   if (res.status === 401) {
     window.location.href = "/login";

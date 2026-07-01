@@ -25,38 +25,44 @@
   }
 </script>
 
-<p class="mb-6">
-  <a href="/" class="text-sm text-tertiary-700 hover:text-primary-600">&larr; back to shelf</a>
-</p>
+<div class="mx-auto max-w-3xl px-6 py-10">
+  <p class="mb-6">
+    <a href="/" class="text-sm text-surface-400 hover:text-primary-300">&larr; back to shelf</a>
+  </p>
 
-<h1 dir="auto" class="h2 font-heading text-left">{job.title ?? job.sha256.slice(0, 12)}</h1>
+  <h1 dir="auto" class="font-heading text-left text-3xl font-bold text-primary-300">
+    {job.title ?? job.sha256.slice(0, 12)}
+  </h1>
 
-<div class="card preset-filled-surface-100-900 mt-6 divide-y divide-surface-300 dark:divide-surface-700">
-  <div class="flex items-center justify-between p-4">
-    <span class="text-sm text-tertiary-600">Status</span>
-    <div class="flex items-center gap-2">
-      {#if job.status === "done"}
-        <span class="badge preset-tonal-success text-xs">done</span>
-      {:else if job.status === "failed"}
-        <span class="badge preset-tonal-error text-xs">failed</span>
-      {:else}
-        <span class="badge-dot preset-filled-primary-500 text-xs">{statusLabel()}</span>
-        <span class="text-xs text-tertiary-500">no fixed SLA — may take minutes to hours</span>
-      {/if}
-    </div>
-  </div>
-  <div class="flex items-center justify-between p-4">
-    <span class="text-sm text-tertiary-600">Pages</span>
-    <span class="font-mono-data text-sm">{job.mistral_pages_processed ?? job.total_pages}</span>
-  </div>
-  {#if job.error}
+  <div class="card jadwal-rule mt-6 divide-y divide-surface-800 bg-surface-900">
     <div class="flex items-center justify-between p-4">
-      <span class="text-sm text-tertiary-600">Error</span>
-      <span class="text-sm text-error-600">{job.error}</span>
+      <span class="text-sm text-surface-400">Status</span>
+      <div class="flex items-center gap-2">
+        {#if job.status === "done"}
+          <span class="badge preset-tonal-success text-xs">done</span>
+        {:else if job.status === "failed"}
+          <span class="badge preset-tonal-error text-xs">failed</span>
+        {:else}
+          <span class="badge-dot preset-tonal-primary text-xs">{statusLabel()}</span>
+          <span class="text-xs text-surface-500">no fixed SLA — may take minutes to hours</span>
+        {/if}
+      </div>
     </div>
+    <div class="flex items-center justify-between p-4">
+      <span class="text-sm text-surface-400">Pages</span>
+      <span class="font-mono-data text-sm text-surface-100">
+        {job.mistral_pages_processed ?? job.total_pages}
+      </span>
+    </div>
+    {#if job.error}
+      <div class="flex items-center justify-between p-4">
+        <span class="text-sm text-surface-400">Error</span>
+        <span class="text-sm text-error-400">{job.error}</span>
+      </div>
+    {/if}
+  </div>
+
+  {#if job.status === "done"}
+    <a href="/jobs/{job.id}/docx" class="btn preset-filled-primary-500 mt-6"> Download .docx </a>
   {/if}
 </div>
-
-{#if job.status === "done"}
-  <a href="/jobs/{job.id}/docx" class="btn preset-filled-secondary-500 mt-6"> Download .docx </a>
-{/if}

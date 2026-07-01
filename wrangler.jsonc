@@ -7,6 +7,7 @@
   "routes": [{ "pattern": "qoyyid.23p.dev", "custom_domain": true }],
   "assets": {
     "directory": "./public",
+    "binding": "ASSETS",
     // Serve index.html for any path that doesn't match a static file (SPA routing).
     "not_found_handling": "single-page-application",
     // Run the worker first for API routes so Hono handles them before asset lookup.

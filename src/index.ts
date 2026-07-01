@@ -79,7 +79,19 @@ app.get("/jobs/:id", (c) => handleGetJob(c.env, c.get("user"), c.req.param("id")
 app.get("/jobs/:id/docx", (c) => handleGetDocx(c.env, c.get("user"), c.req.param("id")));
 app.get("/jobs/:id/document", (c) => handleGetDocument(c.env, c.get("user"), c.req.param("id")));
 
-app.notFound((c) => json({ error: "not found" }, 404));
+// /admin/* is in run_worker_first (see wrangler.jsonc), so this worker — not
+// the platform's SPA fallback — owns 404s under that prefix. Unmatched GETs
+// there are SvelteKit admin pages (/admin/users, /admin/invites, /admin/jobs);
+// hand them to the asset binding so its own single-page-application fallback
+// serves index.html and the client router takes over. JSON API misses under
+// /admin/api/* still 404 as JSON.
+app.notFound((c) => {
+  const url = new URL(c.req.url);
+  if (c.req.method === "GET" && url.pathname.startsWith("/admin/") && !url.pathname.startsWith("/admin/api/")) {
+    return c.env.ASSETS.fetch(c.req.raw);
+  }
+  return json({ error: "not found" }, 404);
+});
 app.onError((err, c) => {
   console.error(err);
   return json({ error: err instanceof Error ? err.message : "internal error" }, 500);

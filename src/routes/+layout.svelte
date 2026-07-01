@@ -1,6 +1,7 @@
 <script lang="ts">
   import "../app.css";
   import { onMount } from "svelte";
+  import { page } from "$app/state";
   import type { LayoutProps } from "./$types";
   import { enableJobNotifications } from "$lib/notifications";
 
@@ -14,23 +15,37 @@
     await fetch("/auth/logout", { method: "POST" });
     window.location.href = "/login";
   }
+
+  let onAdminRoute = $derived(page.url.pathname.startsWith("/admin"));
 </script>
 
 {#if data.me}
-  <header class="jadwal-rule bg-surface-50">
-    <div class="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
-      <a href="/" class="font-heading text-xl font-bold tracking-wide text-surface-950">qoyyid</a>
-      <nav class="flex items-center gap-4 text-sm text-tertiary-700">
-        <a href="/" class="hover:text-primary-600">jobs</a>
+  <header class="jadwal-rule sticky top-0 z-20 bg-surface-950/95 backdrop-blur">
+    <div class="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
+      <a href="/" class="font-heading text-xl font-bold tracking-wide text-primary-300">qoyyid</a>
+      <nav class="flex items-center gap-5 text-sm text-surface-300">
+        <a
+          href="/"
+          class="transition-colors hover:text-primary-300"
+          class:text-primary-300={!onAdminRoute}
+        >
+          shelf
+        </a>
         {#if data.me.is_admin}
-          <a href="/admin/users" class="hover:text-primary-600">admin</a>
+          <a
+            href="/admin/users"
+            class="transition-colors hover:text-primary-300"
+            class:text-primary-300={onAdminRoute}
+          >
+            admin
+          </a>
         {/if}
-        <span class="badge preset-tonal-secondary font-mono-data text-xs">
+        <span class="badge preset-tonal-primary font-mono-data text-xs">
           {data.me.quota_pages_used}/{data.me.quota_pages_limit} pages
         </span>
         <button
           onclick={signOut}
-          class="cursor-pointer text-tertiary-700 underline underline-offset-2 hover:text-primary-600"
+          class="cursor-pointer text-surface-400 underline underline-offset-2 transition-colors hover:text-primary-300"
         >
           sign out
         </button>
@@ -39,6 +54,6 @@
   </header>
 {/if}
 
-<main class="mx-auto max-w-3xl px-6 py-10">
+<main class="min-h-[calc(100vh-64px)] bg-surface-950">
   {@render children()}
 </main>

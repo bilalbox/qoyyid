@@ -47,23 +47,23 @@
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 </svelte:head>
 
-<div class="flex min-h-[80vh] items-center justify-center">
-  <div class="card preset-filled-surface-100-900 jadwal-rule w-full max-w-sm p-8 text-center">
-    <p class="font-heading text-2xl font-bold tracking-wide">qoyyid</p>
-    <p class="mt-2 text-sm text-tertiary-600">
+<div class="flex min-h-screen items-center justify-center bg-surface-950 px-6">
+  <div class="card jadwal-rule w-full max-w-sm bg-surface-900 p-8 text-center shadow-xl shadow-black/40">
+    <p class="font-heading text-3xl font-bold tracking-wide text-primary-300">qoyyid</p>
+    <p class="mt-2 text-sm text-surface-400">
       Turn scanned manuscripts into structured, editable text.
     </p>
 
     {#if error === "invite_required"}
-      <p class="mt-6 text-sm text-error-600">
+      <p class="mt-6 text-sm text-error-400">
         An invite is required to create an account. Ask an admin to add your email.
       </p>
     {/if}
     {#if error === "turnstile_required"}
-      <p class="mt-6 text-sm text-error-600">Please complete the challenge before signing in.</p>
+      <p class="mt-6 text-sm text-error-400">Please complete the challenge before signing in.</p>
     {/if}
     {#if verifyError}
-      <p class="mt-6 text-sm text-error-600">{verifyError}</p>
+      <p class="mt-6 text-sm text-error-400">{verifyError}</p>
     {/if}
 
     {#if siteKey}

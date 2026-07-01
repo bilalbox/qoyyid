@@ -18,12 +18,56 @@
 }
 
 /**
+ * qoyyid runs one fixed dark folio surface rather than toggling with
+ * prefers-color-scheme — the reference brief is a single deliberate look,
+ * not a light/dark pair. -950/-900/-50 are used directly everywhere instead
+ * of Skeleton's adaptive preset-*-100-900 utilities.
+ */
+html {
+  color-scheme: dark;
+  background-color: var(--color-surface-950);
+  color: var(--color-surface-50);
+}
+
+/**
  * The "jadwal" rule — the manuscript folio's ruled border, reused as the
- * page's single recurring divider motif (nav, dropzone, folio cards).
+ * page's single recurring divider motif (header, dropzone, card headers,
+ * table heads). Pine's --color-secondary-* is a maroon/rose hue reserved
+ * strictly for destructive actions, so the rule is drawn in primary (gold)
+ * instead — it's a mark of structure, not of danger.
  */
 .jadwal-rule {
-  border-bottom: 1px solid var(--color-secondary-400);
-  box-shadow: 0 1px 0 0 var(--color-surface-300);
+  border-bottom: 1px solid color-mix(in oklch, var(--color-primary-400) 45%, transparent);
+  box-shadow: 0 1px 0 0 var(--color-surface-950);
+}
+
+/**
+ * A processing-status pill with a pulsing dot — badge-dot isn't a Skeleton
+ * utility, so the dot itself is drawn here rather than assumed from Tailwind.
+ */
+.badge-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  border-radius: var(--radius-base);
+  padding-block: calc(var(--spacing) * 1);
+  padding-inline: calc(var(--spacing) * 3);
+}
+.badge-dot::before {
+  content: "";
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 999px;
+  background-color: currentColor;
+  animation: badge-dot-pulse 1.6s ease-in-out infinite;
+}
+@keyframes badge-dot-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
 }
 
 .font-mono-data {
