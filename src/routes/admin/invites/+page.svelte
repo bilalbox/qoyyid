@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { createInvite, listInvites, type AdminInvite } from "$lib/admin-api";
+  import { createInvite, type AdminInvite } from "$lib/admin-api";
+  import { invalidateAll } from "$app/navigation";
   import type { PageProps } from "./$types";
 
   let { data }: PageProps = $props();
 
-  let invites = $state<AdminInvite[]>(data.invites);
+  let invites = $derived(data.invites);
   let email = $state("");
   let creating = $state(false);
   let error = $state<string | null>(null);
@@ -17,7 +18,7 @@
     try {
       await createInvite(email.trim());
       email = "";
-      invites = await listInvites();
+      await invalidateAll();
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
     } finally {
@@ -26,7 +27,7 @@
   }
 </script>
 
-<svelte:head><title>Invites — qoyyid admin</title></svelte:head>
+<svelte:head><title>الدعوات — إدارة قيد</title></svelte:head>
 
 <form onsubmit={onCreate} class="mb-6 flex gap-2">
   <input
@@ -37,7 +38,7 @@
     class="input bg-surface-900 px-3 py-2 text-sm"
   />
   <button type="submit" class="btn preset-filled-primary-500" disabled={creating}>
-    {creating ? "Creating…" : "Create invite"}
+    {creating ? "جاري الإنشاء…" : "إنشاء دعوة"}
   </button>
 </form>
 {#if error}
@@ -45,12 +46,12 @@
 {/if}
 
 <div class="card jadwal-rule overflow-x-auto bg-surface-900">
-  <table class="w-full text-left text-sm">
+  <table class="w-full text-start text-sm">
     <thead class="jadwal-rule text-xs text-surface-400">
       <tr>
-        <th class="px-4 py-3 font-medium">Email</th>
-        <th class="px-4 py-3 font-medium">Created</th>
-        <th class="px-4 py-3 font-medium">Status</th>
+        <th class="px-4 py-3 font-medium">البريد الإلكتروني</th>
+        <th class="px-4 py-3 font-medium">تاريخ الإنشاء</th>
+        <th class="px-4 py-3 font-medium">الحالة</th>
       </tr>
     </thead>
     <tbody class="divide-y divide-surface-800">
@@ -60,15 +61,15 @@
           <td class="font-mono-data px-4 py-3 text-surface-400">{invite.created_at}</td>
           <td class="px-4 py-3">
             {#if invite.used_at}
-              <span class="badge preset-tonal-success text-xs">used</span>
+              <span class="badge preset-tonal-success text-xs">مستخدمة</span>
             {:else}
-              <span class="badge preset-tonal-primary text-xs">pending</span>
+              <span class="badge preset-tonal-primary text-xs">قيد الانتظار</span>
             {/if}
           </td>
         </tr>
       {:else}
         <tr>
-          <td colspan="3" class="px-4 py-6 text-center text-surface-500">No invites yet.</td>
+          <td colspan="3" class="px-4 py-6 text-center text-surface-500">لا توجد دعوات حتى الآن.</td>
         </tr>
       {/each}
     </tbody>

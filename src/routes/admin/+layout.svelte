@@ -5,15 +5,15 @@
   let { children }: LayoutProps = $props();
 
   const tabs = [
-    { href: "/admin/users", label: "Users" },
-    { href: "/admin/invites", label: "Invites" },
-    { href: "/admin/jobs", label: "Jobs" },
+    { href: "/admin/users", label: "المستخدمون" },
+    { href: "/admin/invites", label: "الدعوات" },
+    { href: "/admin/jobs", label: "الطلبات" },
   ];
 </script>
 
 <div class="mx-auto max-w-5xl px-6 py-10">
   <div class="mb-8 flex items-center justify-between">
-    <h1 class="font-heading text-3xl font-bold text-primary-300">Admin</h1>
+    <h1 class="font-heading text-3xl font-bold text-primary-300">الإدارة</h1>
     <nav class="flex gap-1">
       {#each tabs as tab (tab.href)}
         <a

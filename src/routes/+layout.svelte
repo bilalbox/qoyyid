@@ -22,14 +22,14 @@
 {#if data.me}
   <header class="jadwal-rule sticky top-0 z-20 bg-surface-950/95 backdrop-blur">
     <div class="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-      <a href="/" class="font-heading text-xl font-bold tracking-wide text-primary-300">qoyyid</a>
+      <a href="/" class="font-heading text-xl font-bold tracking-wide text-primary-300">قيد</a>
       <nav class="flex items-center gap-5 text-sm text-surface-300">
         <a
           href="/"
           class="transition-colors hover:text-primary-300"
           class:text-primary-300={!onAdminRoute}
         >
-          shelf
+          الرف
         </a>
         {#if data.me.is_admin}
           <a
@@ -37,17 +37,17 @@
             class="transition-colors hover:text-primary-300"
             class:text-primary-300={onAdminRoute}
           >
-            admin
+            الإدارة
           </a>
         {/if}
         <span class="badge preset-tonal-primary font-mono-data text-xs">
-          {data.me.quota_pages_used}/{data.me.quota_pages_limit} units
+          {data.me.quota_pages_used}/{data.me.quota_pages_limit} وحدة
         </span>
         <button
           onclick={signOut}
           class="cursor-pointer text-surface-400 underline underline-offset-2 transition-colors hover:text-primary-300"
         >
-          sign out
+          تسجيل الخروج
         </button>
       </nav>
     </div>

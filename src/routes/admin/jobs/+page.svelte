@@ -1,10 +1,11 @@
 <script lang="ts">
   import { reproduceDocument, reproduceDocx, type AdminJob } from "$lib/admin-api";
+  import { invalidateAll } from "$app/navigation";
   import type { PageProps } from "./$types";
 
   let { data }: PageProps = $props();
 
-  let jobs = $state<AdminJob[]>(data.jobs);
+  let jobs = $derived(data.jobs);
   let busy = $state<string | null>(null);
   let error = $state<string | null>(null);
 
@@ -14,6 +15,7 @@
     try {
       if (action === "document") await reproduceDocument(job.id);
       else await reproduceDocx(job.id);
+      await invalidateAll();
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
     } finally {
@@ -22,22 +24,22 @@
   }
 </script>
 
-<svelte:head><title>Jobs — qoyyid admin</title></svelte:head>
+<svelte:head><title>الطلبات — إدارة قيد</title></svelte:head>
 
 {#if error}
   <p class="mb-4 text-sm text-error-400">{error}</p>
 {/if}
 
 <div class="card jadwal-rule overflow-x-auto bg-surface-900">
-  <table class="w-full text-left text-sm">
+  <table class="w-full text-start text-sm">
     <thead class="jadwal-rule text-xs text-surface-400">
       <tr>
-        <th class="px-4 py-3 font-medium">Title</th>
-        <th class="px-4 py-3 font-medium">User</th>
-        <th class="px-4 py-3 font-medium">Status</th>
-        <th class="px-4 py-3 font-medium">Created</th>
-        <th class="px-4 py-3 font-medium">Downloads</th>
-        <th class="px-4 py-3 font-medium">Actions</th>
+        <th class="px-4 py-3 font-medium">العنوان</th>
+        <th class="px-4 py-3 font-medium">المستخدم</th>
+        <th class="px-4 py-3 font-medium">الحالة</th>
+        <th class="px-4 py-3 font-medium">تاريخ الإنشاء</th>
+        <th class="px-4 py-3 font-medium">التنزيلات</th>
+        <th class="px-4 py-3 font-medium">الإجراءات</th>
       </tr>
     </thead>
     <tbody class="divide-y divide-surface-800">
@@ -49,9 +51,9 @@
           <td class="px-4 py-3 text-surface-300">{job.user_email}</td>
           <td class="px-4 py-3">
             {#if job.status === "done"}
-              <span class="badge preset-tonal-success text-xs">done</span>
+              <span class="badge preset-tonal-success text-xs">مكتمل</span>
             {:else if job.status === "failed"}
-              <span class="badge preset-tonal-error text-xs" title={job.error ?? ""}>failed</span>
+              <span class="badge preset-tonal-error text-xs" title={job.error ?? ""}>فشل</span>
             {:else}
               <span class="badge-dot preset-tonal-primary text-xs">{job.status}</span>
             {/if}
@@ -91,26 +93,26 @@
                 type="button"
                 class="btn preset-tonal-primary btn-sm"
                 disabled={!job.available.response || busy === `${job.id}:document`}
-                title={job.available.response ? "" : "no stored Mistral response for this job"}
+                title={job.available.response ? "" : "لا توجد استجابة Mistral محفوظة لهذا الطلب"}
                 onclick={() => run("document", job)}
               >
-                {busy === `${job.id}:document` ? "Working…" : "Reproduce document"}
+                {busy === `${job.id}:document` ? "جاري العمل…" : "إعادة إنشاء المستند"}
               </button>
               <button
                 type="button"
                 class="btn preset-tonal-primary btn-sm"
                 disabled={!job.available.document || busy === `${job.id}:docx`}
-                title={job.available.document ? "" : "no stored document.json for this job"}
+                title={job.available.document ? "" : "لا يوجد document.json محفوظ لهذا الطلب"}
                 onclick={() => run("docx", job)}
               >
-                {busy === `${job.id}:docx` ? "Working…" : "Reproduce docx"}
+                {busy === `${job.id}:docx` ? "جاري العمل…" : "إعادة إنشاء docx"}
               </button>
             </div>
           </td>
         </tr>
       {:else}
         <tr>
-          <td colspan="6" class="px-4 py-6 text-center text-surface-500">No jobs yet.</td>
+          <td colspan="6" class="px-4 py-6 text-center text-surface-500">لا توجد طلبات حتى الآن.</td>
         </tr>
       {/each}
     </tbody>
