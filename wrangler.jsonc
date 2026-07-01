@@ -10,7 +10,7 @@
     // Serve index.html for any path that doesn't match a static file (SPA routing).
     "not_found_handling": "single-page-application",
     // Run the worker first for API routes so Hono handles them before asset lookup.
-    "run_worker_first": ["/auth/*", "/jobs", "/jobs/*", "/admin", "/admin/*", "/health", "/me"],
+    "run_worker_first": ["/auth/*", "/jobs", "/jobs/*", "/admin", "/admin/*", "/health", "/me", "/me/*"],
   },
   "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "qoyyid-jobs" }],
   "d1_databases": [
@@ -26,5 +26,6 @@
   },
   // Secrets: set via `npx wrangler secret put <NAME>`, or bulk-upload from
   // .env with `wrangler deploy --secrets-file=.env` (see .env.example).
-  //   MISTRAL_API_KEY, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, ADMIN_EMAILS
+  //   MISTRAL_API_KEY, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, ADMIN_EMAILS,
+  //   TURNSTILE_SECRET_KEY, FCM_SERVICE_ACCOUNT_JSON
 }

@@ -5,9 +5,11 @@ import { normalizeDocument } from "./normalize";
 import { documentToDocxBuffer } from "./docx-export";
 import { fetchBatchResult, type MistralBatchJobStatus } from "./mistral";
 import { mapMistralPageToQoyyidPage, stripRunningHeaders } from "./mistral-mapping";
+import { notifyUser } from "./fcm";
 
 interface JobForMerge {
   id: string;
+  user_id: string;
   sha256: string;
   pdf_key: string;
   title: string | null;
@@ -34,7 +36,7 @@ export async function finalizeJob(env: Env, jobId: string, batchStatus: MistralB
   if (claimed.meta.changes === 0) return;
 
   const row = await env.DB.prepare(
-    "SELECT id, sha256, pdf_key, title, mistral_batch_job_id FROM jobs WHERE id = ?",
+    "SELECT id, user_id, sha256, pdf_key, title, mistral_batch_job_id FROM jobs WHERE id = ?",
   )
     .bind(jobId)
     .first<JobForMerge>();
@@ -89,6 +91,12 @@ export async function finalizeJob(env: Env, jobId: string, batchStatus: MistralB
         jobId,
       ),
     ]);
+
+    await notifyUser(env, row.user_id, {
+      title: "Document ready",
+      body: row.title ? `"${row.title}" finished processing.` : "Your document finished processing.",
+      data: { jobId },
+    });
   } catch (e) {
     await markJobFailed(env, jobId, e instanceof Error ? e.message : String(e));
     throw e;
@@ -96,7 +104,15 @@ export async function finalizeJob(env: Env, jobId: string, batchStatus: MistralB
 }
 
 export async function markJobFailed(env: Env, jobId: string, error: string): Promise<void> {
-  await env.DB.prepare(`UPDATE jobs SET status = 'failed', error = ?, updated_at = datetime('now') WHERE id = ?`)
+  const row = await env.DB.prepare(`UPDATE jobs SET status = 'failed', error = ?, updated_at = datetime('now') WHERE id = ? RETURNING user_id, title`)
     .bind(error, jobId)
-    .run();
+    .first<{ user_id: string; title: string | null }>();
+
+  if (row) {
+    await notifyUser(env, row.user_id, {
+      title: "Document processing failed",
+      body: row.title ? `"${row.title}" failed to process.` : "A document failed to process.",
+      data: { jobId },
+    });
+  }
 }

@@ -16,36 +16,47 @@
     }, 5000);
     return () => clearInterval(interval);
   });
+
+  function statusLabel(): string {
+    if (job.status === "batch_submitted" || job.status === "batch_running") {
+      return "processing";
+    }
+    return job.status;
+  }
 </script>
 
-<p><a href="/">&larr; back</a></p>
-<h1>{job.title ?? job.sha256.slice(0, 12)}</h1>
+<p class="mb-6">
+  <a href="/" class="text-sm text-tertiary-700 hover:text-primary-600">&larr; back to shelf</a>
+</p>
 
-<dl>
-  <dt>Status</dt>
-  <dd>
-    {job.status}
-    {#if job.status === "batch_submitted" || job.status === "batch_running"}
-      <span class="hint">(no fixed SLA — may take minutes to hours)</span>
-    {/if}
-  </dd>
-  <dt>Pages</dt>
-  <dd>{job.mistral_pages_processed ?? job.total_pages}</dd>
+<h1 dir="auto" class="h2 font-heading text-left">{job.title ?? job.sha256.slice(0, 12)}</h1>
+
+<div class="card preset-filled-surface-100-900 mt-6 divide-y divide-surface-300 dark:divide-surface-700">
+  <div class="flex items-center justify-between p-4">
+    <span class="text-sm text-tertiary-600">Status</span>
+    <div class="flex items-center gap-2">
+      {#if job.status === "done"}
+        <span class="badge preset-tonal-success text-xs">done</span>
+      {:else if job.status === "failed"}
+        <span class="badge preset-tonal-error text-xs">failed</span>
+      {:else}
+        <span class="badge-dot preset-filled-primary-500 text-xs">{statusLabel()}</span>
+        <span class="text-xs text-tertiary-500">no fixed SLA — may take minutes to hours</span>
+      {/if}
+    </div>
+  </div>
+  <div class="flex items-center justify-between p-4">
+    <span class="text-sm text-tertiary-600">Pages</span>
+    <span class="font-mono-data text-sm">{job.mistral_pages_processed ?? job.total_pages}</span>
+  </div>
   {#if job.error}
-    <dt>Error</dt>
-    <dd class="error">{job.error}</dd>
+    <div class="flex items-center justify-between p-4">
+      <span class="text-sm text-tertiary-600">Error</span>
+      <span class="text-sm text-error-600">{job.error}</span>
+    </div>
   {/if}
-</dl>
+</div>
 
 {#if job.status === "done"}
-  <a href="/jobs/{job.id}/docx">Download .docx</a>
+  <a href="/jobs/{job.id}/docx" class="btn preset-filled-secondary-500 mt-6"> Download .docx </a>
 {/if}
-
-<style>
-  .error {
-    color: #b00020;
-  }
-  .hint {
-    color: #666;
-  }
-</style>

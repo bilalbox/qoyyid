@@ -11,6 +11,13 @@ import {
   isAdminEmail,
 } from "./users";
 import type { Session, User } from "./users";
+import {
+  signTurnstileCookie,
+  verifyTurnstileCookie,
+  verifyTurnstileToken,
+  TURNSTILE_COOKIE_NAME,
+  TURNSTILE_COOKIE_MAX_AGE_S,
+} from "./turnstile";
 
 type Variables = { user: User; session: Session };
 
@@ -19,7 +26,31 @@ const SESSION_COOKIE_MAX_AGE_S = 60 * 60 * 24 * 30;
 
 export const auth = new Hono<{ Bindings: Env; Variables: Variables }>();
 
+auth.post("/auth/turnstile/verify", async (c) => {
+  const { token } = await c.req.json<{ token?: string }>().catch(() => ({ token: undefined }));
+  if (!token) return c.json({ error: "missing token" }, 400);
+
+  const remoteIp = c.req.header("CF-Connecting-IP") ?? undefined;
+  const ok = await verifyTurnstileToken(c.env, token, remoteIp);
+  if (!ok) return c.json({ error: "turnstile challenge failed" }, 403);
+
+  // setCookie() stages the header on `c` — must return via c.json() (not the
+  // standalone json() helper, which builds an unrelated Response) or the
+  // Set-Cookie header never reaches the client.
+  setCookie(c, TURNSTILE_COOKIE_NAME, await signTurnstileCookie(c.env.TURNSTILE_SECRET_KEY), {
+    path: "/",
+    secure: true,
+    httpOnly: true,
+    sameSite: "Lax",
+    maxAge: TURNSTILE_COOKIE_MAX_AGE_S,
+  });
+  return c.json({ success: true });
+});
+
 auth.get("/auth/google", async (c) => {
+  const verified = await verifyTurnstileCookie(c.env.TURNSTILE_SECRET_KEY, getCookie(c, TURNSTILE_COOKIE_NAME));
+  if (!verified) return c.redirect("/login?error=turnstile_required");
+
   const state = generateState();
   const codeVerifier = generateCodeVerifier();
   const redirectURI = new URL("/auth/google/callback", c.req.url).toString();

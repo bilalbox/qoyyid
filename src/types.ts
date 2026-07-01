@@ -64,6 +64,8 @@ export interface Env {
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
   ADMIN_EMAILS: string;
+  TURNSTILE_SECRET_KEY: string;
+  FCM_SERVICE_ACCOUNT_JSON: string;
 }
 
 export interface JobRow {

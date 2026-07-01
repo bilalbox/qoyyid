@@ -8,6 +8,7 @@
   let uploading = $state(false);
   let uploadError = $state<string | null>(null);
   let fileInput: HTMLInputElement | undefined = $state();
+  let fileName = $state<string | null>(null);
 
   $effect(() => {
     const pending = jobs.filter((j) => !isTerminal(j.status));
@@ -38,6 +39,7 @@
       const job = await getJob(job_id);
       jobs = [job, ...jobs.filter((j) => j.id !== job.id)];
       if (fileInput) fileInput.value = "";
+      fileName = null;
     } catch (err) {
       uploadError = err instanceof Error ? err.message : String(err);
     } finally {
@@ -45,58 +47,112 @@
     }
   }
 
+  function onFileChange() {
+    fileName = fileInput?.files?.[0]?.name ?? null;
+  }
+
+  const relTime = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+  function updatedAgo(iso: string): string {
+    const diffMs = new Date(iso).getTime() - Date.now();
+    const mins = Math.round(diffMs / 60000);
+    if (Math.abs(mins) < 60) return relTime.format(mins, "minute");
+    const hours = Math.round(mins / 60);
+    if (Math.abs(hours) < 24) return relTime.format(hours, "hour");
+    return relTime.format(Math.round(hours / 24), "day");
+  }
+
   function statusLabel(job: Job): string {
     if (job.status === "batch_submitted" || job.status === "batch_running") {
-      return "processing (may take up to a day)";
+      return "processing";
     }
     return job.status;
   }
 </script>
 
-<h1>qoyyid</h1>
+<div class="space-y-10">
+  <section>
+    <h2 class="h4 mb-3">Upload a manuscript</h2>
+    <form onsubmit={onUpload}>
+      <label
+        class="flex cursor-pointer flex-col items-center gap-1 rounded-container border-2 border-dashed border-secondary-400/60 bg-surface-100/60 px-6 py-10 text-center transition-colors hover:border-primary-500 hover:bg-surface-100"
+      >
+        <span class="font-medium">{fileName ?? "Drop a PDF here, or click to browse"}</span>
+        <span class="text-sm text-tertiary-600">
+          Scanned pages only — OCR reads the images, not embedded text.
+        </span>
+        <input
+          type="file"
+          accept="application/pdf"
+          class="sr-only"
+          bind:this={fileInput}
+          onchange={onFileChange}
+          required
+        />
+      </label>
+      <button type="submit" class="btn preset-filled-primary-500 mt-4" disabled={uploading}>
+        {uploading ? "Uploading…" : "Upload PDF"}
+      </button>
+    </form>
+    {#if uploadError}
+      <p class="mt-2 text-sm text-error-600">{uploadError}</p>
+    {/if}
+  </section>
 
-<form onsubmit={onUpload}>
-  <input type="file" accept="application/pdf" bind:this={fileInput} required />
-  <button type="submit" disabled={uploading}>{uploading ? "Uploading…" : "Upload PDF"}</button>
-</form>
-{#if uploadError}
-  <p class="error">{uploadError}</p>
-{/if}
+  <section>
+    <div class="mb-3 flex items-center justify-between">
+      <h2 class="h4">Your shelf</h2>
+      <span class="font-mono-data text-xs text-tertiary-600">
+        {jobs.length}
+        {jobs.length === 1 ? "manuscript" : "manuscripts"}
+      </span>
+    </div>
 
-<table>
-  <thead>
-    <tr><th>Title</th><th>Status</th><th>Pages</th><th></th></tr>
-  </thead>
-  <tbody>
-    {#each jobs as job (job.id)}
-      <tr>
-        <td>{job.title ?? job.sha256.slice(0, 12)}</td>
-        <td>{statusLabel(job)}</td>
-        <td>{job.mistral_pages_processed ?? job.total_pages}</td>
-        <td>
-          <a href="/jobs/{job.id}">details</a>
-          {#if job.status === "done"}
-            · <a href="/jobs/{job.id}/docx">download</a>
-          {/if}
-        </td>
-      </tr>
-    {/each}
-  </tbody>
-</table>
-
-<style>
-  .error {
-    color: #b00020;
-  }
-  table {
-    border-collapse: collapse;
-    width: 100%;
-    margin-top: 1rem;
-  }
-  td,
-  th {
-    border: 1px solid #ccc;
-    padding: 0.4rem 0.6rem;
-    text-align: left;
-  }
-</style>
+    {#if jobs.length === 0}
+      <div class="card preset-filled-surface-100-900 p-6 text-center text-tertiary-600">
+        Your shelf is empty — upload a manuscript above to begin.
+      </div>
+    {:else}
+      <ul class="space-y-3">
+        {#each jobs as job (job.id)}
+          <li
+            class="card relative border border-surface-200 bg-surface-50 p-4 transition-colors hover:bg-surface-100"
+          >
+            <div class="flex items-start justify-between gap-4">
+              <div class="min-w-0">
+                <a href="/jobs/{job.id}" class="static after:absolute after:inset-0">
+                  <p dir="auto" class="font-heading truncate text-left text-lg font-bold">
+                    {job.title ?? job.sha256.slice(0, 12)}
+                  </p>
+                </a>
+                <p class="font-mono-data mt-1 text-sm text-tertiary-600">
+                  {job.mistral_pages_processed ?? job.total_pages} pages · updated {updatedAgo(
+                    job.updated_at,
+                  )}
+                </p>
+              </div>
+              <div class="relative z-10 flex shrink-0 items-center gap-2">
+                {#if job.status === "done"}
+                  <span class="badge preset-tonal-success text-xs">done</span>
+                  <a
+                    href="/jobs/{job.id}/docx"
+                    class="btn-icon preset-tonal-secondary"
+                    title="Download .docx"
+                    aria-label="Download .docx"
+                  >
+                    ↓
+                  </a>
+                {:else if job.status === "failed"}
+                  <span class="badge preset-tonal-error text-xs">failed</span>
+                {:else}
+                  <span class="badge-dot preset-filled-primary-500 text-xs">
+                    {statusLabel(job)}
+                  </span>
+                {/if}
+              </div>
+            </div>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </section>
+</div>

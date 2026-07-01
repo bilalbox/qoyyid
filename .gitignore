@@ -16,6 +16,9 @@ public/
 *.swp
 *.swo
 
+# Agents
+.agents/skills/*
+
 # OS
 Thumbs.db
 .DS_Store

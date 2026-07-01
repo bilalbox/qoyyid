@@ -14,17 +14,26 @@
   "dependencies": {
     "@oslojs/encoding": "^1.1.0",
     "arctic": "^3.7.0",
-    "docx": "^9.5.0",
+    "docx": "^9.7.1",
+    "firebase": "^12.15.0",
     "hono": "^4.12.27"
   },
   "devDependencies": {
+    "@fontsource-variable/vazirmatn": "^5.2.8",
+    "@fontsource/ibm-plex-mono": "^5.2.7",
+    "@fontsource/reem-kufi": "^5.2.11",
+    "@skeletonlabs/skeleton": "^4.15.2",
+    "@skeletonlabs/skeleton-svelte": "^4.15.2",
     "@sveltejs/adapter-static": "^3.0.10",
     "@sveltejs/kit": "^2.68.0",
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
+    "@tailwindcss/vite": "^4.3.2",
     "svelte": "^5.56.4",
     "svelte-check": "^4.7.1",
-    "typescript": "^5.8.3",
-    "vite": "^8.0.0",
-    "wrangler": "^4.20.0"
-  }
+    "tailwindcss": "^4.3.2",
+    "typescript": "^5.9.3",
+    "vite": "^8.1.0",
+    "wrangler": "^4.105.0"
+  },
+  "packageManager": "pnpm@11.9.0+sha512.bd682d5d03fe525ef7c9fd6780c6884d1e756ac4c9c9fe00c538782824310dcf90e3ddc4f53835f06dfaebd5085e41855e0bcbb3b60de2ac5bbab89e5036f03b"
 }

@@ -39,12 +39,38 @@ app.route("/", auth);
 
 app.use("/jobs/*", requireAuth);
 app.use("/me", requireAuth);
+app.use("/me/*", requireAuth);
 app.use("/admin/*", requireAuth, requireAdmin);
 app.route("/", admin);
 
 app.get("/me", (c) => {
   const { id, email, is_admin, quota_pages_limit, quota_pages_used } = c.get("user");
   return json({ id, email, is_admin: Boolean(is_admin), quota_pages_limit, quota_pages_used });
+});
+
+app.post("/me/fcm-token", async (c) => {
+  const { token } = await c.req.json<{ token?: string }>().catch(() => ({ token: undefined }));
+  if (!token) return json({ error: "missing token" }, 400);
+
+  // Token is globally unique in FCM; re-registering under a new user (shared
+  // device, different Google account) should move it rather than conflict.
+  await c.env.DB.prepare(
+    `INSERT INTO fcm_tokens (token, user_id) VALUES (?, ?)
+     ON CONFLICT(token) DO UPDATE SET user_id = excluded.user_id`,
+  )
+    .bind(token, c.get("user").id)
+    .run();
+
+  return json({ success: true });
+});
+
+app.delete("/me/fcm-token", async (c) => {
+  const { token } = await c.req.json<{ token?: string }>().catch(() => ({ token: undefined }));
+  if (!token) return json({ error: "missing token" }, 400);
+  await c.env.DB.prepare("DELETE FROM fcm_tokens WHERE token = ? AND user_id = ?")
+    .bind(token, c.get("user").id)
+    .run();
+  return json({ success: true });
 });
 
 app.post("/jobs", (c) => handleCreateJob(c.req.raw, c.env, c.executionCtx, c.get("user")));

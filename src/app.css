@@ -1,0 +1,25 @@
+@import "tailwindcss";
+@import "@skeletonlabs/skeleton";
+@import "@skeletonlabs/skeleton-svelte";
+@import "./manuscript-theme.css";
+
+@import "@fontsource/reem-kufi/latin-700.css";
+@import "@fontsource/reem-kufi/latin-400.css";
+@import "@fontsource-variable/vazirmatn";
+@import "@fontsource/ibm-plex-mono/latin-400.css";
+@import "@fontsource/ibm-plex-mono/latin-500.css";
+
+@source "../node_modules/@skeletonlabs/skeleton-svelte/dist";
+
+/**
+ * The "jadwal" rule — the manuscript folio's ruled border, reused as the
+ * page's single recurring divider motif (nav, dropzone, folio cards).
+ */
+.jadwal-rule {
+  border-bottom: 1px solid var(--color-secondary-400);
+  box-shadow: 0 1px 0 0 var(--color-surface-300);
+}
+
+.font-mono-data {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+}
