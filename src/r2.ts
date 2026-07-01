@@ -1,0 +1,32 @@
+export async function sha256Hex(data: ArrayBuffer): Promise<string> {
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+export async function getBytes(bucket: R2Bucket, key: string): Promise<Uint8Array | null> {
+  const obj = await bucket.get(key);
+  if (!obj) return null;
+  return new Uint8Array(await obj.arrayBuffer());
+}
+
+export async function putBytes(
+  bucket: R2Bucket,
+  key: string,
+  body: Uint8Array | ArrayBuffer,
+  contentType?: string,
+): Promise<void> {
+  await bucket.put(key, body, contentType ? { httpMetadata: { contentType } } : undefined);
+}
+
+export async function putJson(bucket: R2Bucket, key: string, data: unknown): Promise<void> {
+  const body = JSON.stringify(data, null, 0);
+  await bucket.put(key, body, {
+    httpMetadata: { contentType: "application/json; charset=utf-8" },
+  });
+}
+
+export async function getJson<T>(bucket: R2Bucket, key: string): Promise<T | null> {
+  const obj = await bucket.get(key);
+  if (!obj) return null;
+  return (await obj.json()) as T;
+}
