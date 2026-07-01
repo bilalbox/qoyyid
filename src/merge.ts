@@ -3,7 +3,7 @@ import { jobKeys } from "./http";
 import { putBytes, putJson } from "./r2";
 import { normalizeDocument } from "./normalize";
 import { documentToDocxBuffer } from "./docx-export";
-import { fetchBatchResult, type MistralBatchJobStatus } from "./mistral";
+import { fetchBatchResult, type MistralBatchJobStatus, type MistralBatchResultLine } from "./mistral";
 import { mapMistralPageToQoyyidPage, stripRunningHeaders } from "./mistral-mapping";
 import { notifyUser } from "./fcm";
 
@@ -14,6 +14,48 @@ interface JobForMerge {
   pdf_key: string;
   title: string | null;
   mistral_batch_job_id: string | null;
+}
+
+export interface JobForBuild {
+  pdf_key: string;
+  sha256: string;
+  title: string | null;
+}
+
+/**
+ * Maps a stored/fetched Mistral batch result line into qoyyid's Document
+ * schema and builds the matching .docx. Pure (no R2/DB writes) so both the
+ * original finalizeJob path and the admin "reproduce document.json" action
+ * can share it and stay in sync.
+ */
+export async function buildDocumentAndDocx(
+  job: JobForBuild,
+  jobId: string,
+  resultLine: MistralBatchResultLine,
+): Promise<{ doc: Document; docx: Uint8Array; pagesProcessed: number }> {
+  const mistralPages = resultLine.response?.body?.pages;
+  if (!mistralPages || mistralPages.length === 0) {
+    throw new Error(`no OCR result for job ${jobId} in batch output`);
+  }
+
+  const mapped = mistralPages.map(mapMistralPageToQoyyidPage);
+  stripRunningHeaders(mapped);
+  const pages = mapped.map((m) => m.page);
+
+  const doc: Document = {
+    source: { input: job.pdf_key, sha256: job.sha256, modality: "pdf" },
+    metadata: {
+      title: job.title,
+      page_count: pages.length,
+      languages: ["ar"],
+      engines_used: ["mistral-ocr-latest", "cloud-orchestrator"],
+    },
+    pages,
+  };
+
+  normalizeDocument(doc);
+  const docx = await documentToDocxBuffer(doc);
+  return { doc, docx, pagesProcessed: pages.length };
 }
 
 /**
@@ -50,34 +92,20 @@ export async function finalizeJob(env: Env, jobId: string, batchStatus: MistralB
     }
     const results = await fetchBatchResult(env, batchStatus.output_file);
     const resultLine = results.find((r) => r.custom_id === jobId);
-    const mistralPages = resultLine?.response?.body?.pages;
-    if (!mistralPages || mistralPages.length === 0) {
+    if (!resultLine) {
       throw new Error(`no OCR result for job ${jobId} in batch output`);
     }
 
-    const mapped = mistralPages.map(mapMistralPageToQoyyidPage);
-    stripRunningHeaders(mapped);
-    const pages = mapped.map((m) => m.page);
-
-    const doc: Document = {
-      source: { input: row.pdf_key, sha256: row.sha256, modality: "pdf" },
-      metadata: {
-        title: row.title,
-        page_count: pages.length,
-        languages: ["ar"],
-        engines_used: ["mistral-ocr-latest", "cloud-orchestrator"],
-      },
-      pages,
-    };
-
-    normalizeDocument(doc);
+    // Persisted before mapping/docx-export run, so a bug in either of those
+    // still leaves an admin something to reproduce from (see /admin/jobs) —
+    // this is the sole source of truth for reprocessing, since Mistral
+    // doesn't retain batch output indefinitely.
     const keys = jobKeys(jobId);
+    await putJson(env.BUCKET, keys.mistralResponse, resultLine);
+
+    const { doc, docx, pagesProcessed } = await buildDocumentAndDocx(row, jobId, resultLine);
     await putJson(env.BUCKET, keys.document, doc);
-
-    const docx = await documentToDocxBuffer(doc);
     await putBytes(env.BUCKET, keys.docx, docx, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-
-    const pagesProcessed = pages.length;
 
     await env.DB.batch([
       env.DB.prepare(

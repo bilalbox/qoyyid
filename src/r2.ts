@@ -30,3 +30,7 @@ export async function getJson<T>(bucket: R2Bucket, key: string): Promise<T | nul
   if (!obj) return null;
   return (await obj.json()) as T;
 }
+
+export async function exists(bucket: R2Bucket, key: string): Promise<boolean> {
+  return (await bucket.head(key)) !== null;
+}

@@ -8,6 +8,7 @@ import {
   TextRun,
   type IRunOptions,
 } from "docx";
+import { SUPERSCRIPT_MARK_CLOSE, SUPERSCRIPT_MARK_OPEN } from "./mistral-mapping";
 import type { Block, Document, Line, Page } from "./types";
 
 const GAP_RATIO = 1.35;
@@ -165,13 +166,68 @@ function runOpts(styleKey: string): IRunOptions {
   };
 }
 
+const SUPERSCRIPT_SPLIT_RE = new RegExp(
+  `${SUPERSCRIPT_MARK_OPEN}([^${SUPERSCRIPT_MARK_CLOSE}]*)${SUPERSCRIPT_MARK_CLOSE}`,
+  "g",
+);
+
+// Splits paragraph text around the PUA sentinels left by mistral-mapping's
+// markInlineFootnoteMarkup, so an inline footnote reference like "(٣)" can be
+// emitted as its own raised, smaller run instead of full-size inline text.
+function splitSuperscriptSegments(text: string): Array<{ text: string; superScript: boolean }> {
+  const segments: Array<{ text: string; superScript: boolean }> = [];
+  let lastIndex = 0;
+  for (const match of text.matchAll(SUPERSCRIPT_SPLIT_RE)) {
+    const index = match.index ?? 0;
+    if (index > lastIndex) segments.push({ text: text.slice(lastIndex, index), superScript: false });
+    segments.push({ text: match[1], superScript: true });
+    lastIndex = index + match[0].length;
+  }
+  if (lastIndex < text.length) segments.push({ text: text.slice(lastIndex), superScript: false });
+  return segments.filter((s) => s.text.length > 0);
+}
+
+// Builds the TextRun(s) for a paragraph's text, splitting out any inline
+// footnote references into their own superscript run.
+function runsForText(text: string, styleKey: string): TextRun[] {
+  const base = runOpts(styleKey);
+  const segments = splitSuperscriptSegments(text);
+  if (!segments.length) return [new TextRun({ ...base, text } as IRunOptions)];
+  return segments.map(
+    (seg) =>
+      new TextRun({
+        ...base,
+        text: seg.text,
+        superScript: seg.superScript || undefined,
+        size: seg.superScript ? Math.round((base.size as number) * 0.7) : base.size,
+      } as IRunOptions),
+  );
+}
+
 function rtlProps(extra?: { spacing?: { before?: number } }): {
   alignment: (typeof AlignmentType)[keyof typeof AlignmentType];
   bidirectional: boolean;
   spacing?: { before?: number };
 } {
   return {
-    alignment: AlignmentType.RIGHT,
+    // AlignmentType.RIGHT ("right") is a *physical* value — with bidi text
+    // Word doesn't reliably render it flush to the visual right, it can come
+    // out flush left despite the RTL paragraph direction. AlignmentType.START
+    // ("start") is logical: it means the reading-direction start edge, which
+    // for an RTL paragraph is the visual right — the actual intent here.
+    alignment: AlignmentType.START,
+    bidirectional: true,
+    ...extra,
+  };
+}
+
+function centeredRtlProps(extra?: { spacing?: { before?: number } }): {
+  alignment: (typeof AlignmentType)[keyof typeof AlignmentType];
+  bidirectional: boolean;
+  spacing?: { before?: number };
+} {
+  return {
+    alignment: AlignmentType.CENTER,
     bidirectional: true,
     ...extra,
   };
@@ -187,8 +243,8 @@ function writeHeading(children: Paragraph[], block: Block): void {
     children.push(
       new Paragraph({
         heading,
-        ...rtlProps({ spacing: spec.spaceBefore ? { before: spec.spaceBefore * 20 } : undefined }),
-        children: [new TextRun({ text, ...runOpts(styleKey) } as IRunOptions)],
+        ...centeredRtlProps({ spacing: spec.spaceBefore ? { before: spec.spaceBefore * 20 } : undefined }),
+        children: runsForText(text, styleKey),
       }),
     );
   }
@@ -216,7 +272,7 @@ function writeTypedBlock(children: Paragraph[], block: Block): void {
               ? { before: spec.spaceBefore * 20 }
               : undefined,
         }),
-        children: [new TextRun({ text, ...runOpts(styleKey) } as IRunOptions)],
+        children: runsForText(text, styleKey),
       }),
     );
   }
@@ -246,14 +302,14 @@ function buildCustomStyles(): NonNullable<NonNullable<ConstructorParameters<type
         color: spec.color,
         rightToLeft: true,
       },
-      paragraph: { alignment: AlignmentType.RIGHT },
+      paragraph: { alignment: AlignmentType.START },
     });
   }
   return {
     default: {
       document: {
         run: { font: ARABIC_FONT, size: 56, rightToLeft: true },
-        paragraph: { alignment: AlignmentType.RIGHT },
+        paragraph: { alignment: AlignmentType.START },
       },
     },
     paragraphStyles,
@@ -293,7 +349,7 @@ export async function documentToDocxBuffer(doc: Document): Promise<Uint8Array> {
           const style = paragraphStyleHeuristic(text);
           children.push(
             new Paragraph({
-              ...rtlProps(),
+              ...(style === "heading" ? centeredRtlProps() : rtlProps()),
               children: [
                 new TextRun({
                   text,
@@ -312,7 +368,7 @@ export async function documentToDocxBuffer(doc: Document): Promise<Uint8Array> {
       children.push(
         new Paragraph({
           ...rtlProps(),
-          children: [new TextRun({ text, ...runOpts("body") } as IRunOptions)],
+          children: runsForText(text, "body"),
         }),
       );
     }

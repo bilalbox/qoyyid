@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @import "@skeletonlabs/skeleton";
 @import "@skeletonlabs/skeleton-svelte";
-@import "./manuscript-theme.css";
+@import "@skeletonlabs/skeleton/themes/pine";
 
 @import "@fontsource/reem-kufi/latin-700.css";
 @import "@fontsource/reem-kufi/latin-400.css";
@@ -10,6 +10,12 @@
 @import "@fontsource/ibm-plex-mono/latin-500.css";
 
 @source "../node_modules/@skeletonlabs/skeleton-svelte/dist";
+
+/* Arabic-friendly typefaces layered onto the pine theme's palette. */
+[data-theme="pine"] {
+  --base-font-family: "Vazirmatn Variable", sans-serif;
+  --heading-font-family: "Reem Kufi", sans-serif;
+}
 
 /**
  * The "jadwal" rule — the manuscript folio's ruled border, reused as the
@@ -22,4 +28,8 @@
 
 .font-mono-data {
   font-family: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+.font-heading {
+  font-family: var(--heading-font-family);
 }

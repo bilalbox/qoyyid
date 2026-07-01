@@ -9,6 +9,7 @@ export function jobKeys(jobId: string) {
   const base = `jobs/${jobId}`;
   return {
     meta: `${base}/meta.json`,
+    mistralResponse: `${base}/mistral_response.json`,
     document: `${base}/document.json`,
     docx: `${base}/output.docx`,
   };

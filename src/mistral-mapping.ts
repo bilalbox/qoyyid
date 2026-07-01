@@ -86,6 +86,23 @@ const HEADING_RE = /^(#{1,6})\s+(.*)$/;
 // digits (e.g. "(1)" or "(١)") — Mistral gives no other structural signal
 // separating footnotes from body text (no rule/divider survives into markdown).
 const FOOTNOTE_RE = /^\(([0-9]+|[٠-٩]+)\)/;
+// An inline footnote reference the way Mistral renders it mid-sentence,
+// e.g. "...word$^{(٣)}$ more text" — LaTeX superscript wrapping a plain
+// parenthesized number. There's no real math here, so we drop the literal
+// "$^{}$" wrapper but keep the "(٣)" wrapped in a pair of Private Use Area
+// sentinel characters, which downstream renderers (docx-export) use to know
+// this span should be typeset as an actual raised superscript rather than
+// full-size inline text. Plain-text consumers of block text (doc.text_normalized)
+// never see these sentinels — they're invisible/non-printing PUA codepoints
+// and get treated as ordinary characters if left un-stripped, but docx-export
+// always consumes them before output reaches a user.
+export const SUPERSCRIPT_MARK_OPEN = "";
+export const SUPERSCRIPT_MARK_CLOSE = "";
+const INLINE_FOOTNOTE_REF_RE = /\$\^\{(\([0-9٠-٩]+\))\}\$/g;
+
+function markInlineFootnoteMarkup(text: string): string {
+  return text.replace(INLINE_FOOTNOTE_REF_RE, `${SUPERSCRIPT_MARK_OPEN}$1${SUPERSCRIPT_MARK_CLOSE}`);
+}
 // A paragraph that is only digits/dashes/dots/whitespace — a bare page number
 // or ruler artifact, not real content (the merge step already inserts its own
 // page-boundary marker, so these would just duplicate it as noise).
@@ -94,7 +111,7 @@ const PAGE_NUMBER_ONLY_RE = /^[\s0-9٠-٩\-–—.]+$/;
 function splitMarkdownParagraphs(markdown: string): string[] {
   return markdown
     .split(/\n\s*\n+/)
-    .map((p) => p.replace(/\s*\n\s*/g, " ").trim())
+    .map((p) => markInlineFootnoteMarkup(p.replace(/\s*\n\s*/g, " ").trim()))
     .filter(Boolean);
 }
 
