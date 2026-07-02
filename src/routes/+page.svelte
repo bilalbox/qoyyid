@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { isTerminal, uploadJob, type Job } from "$lib/api";
+  import { isTerminal, uploadJob } from "$lib/api";
   import { invalidateAll } from "$app/navigation";
+  import JobStatus from "$lib/components/JobStatus.svelte";
   import type { PageProps } from "./$types";
 
   let { data }: PageProps = $props();
@@ -53,28 +54,19 @@
     if (Math.abs(hours) < 24) return relTime.format(hours, "hour");
     return relTime.format(Math.round(hours / 24), "day");
   }
-
-  function statusLabel(job: Job): string {
-    if (job.status === "batch_submitted" || job.status === "batch_running") {
-      return "قيد المعالجة";
-    }
-    if (job.status === "uploaded") return "مرفوع";
-    if (job.status === "mapping") return "قيد المعالجة";
-    return job.status;
-  }
 </script>
 
-<div class="mx-auto max-w-3xl space-y-10 px-6 py-10">
+<div class="mx-auto max-w-2xl space-y-12 px-6 py-12">
   <section>
-    <h2 class="font-heading text-xl font-bold text-primary-300">رفع مخطوطة أو ملف صوتي</h2>
-    <form onsubmit={onUpload} class="mt-3">
+    <h2 class="font-heading text-lg text-surface-200">رفع مخطوطة أو ملف صوتي</h2>
+    <form onsubmit={onUpload} class="mt-4">
       <label
-        class="flex cursor-pointer flex-col items-center gap-1 rounded-container border-2 border-dashed border-surface-700 bg-surface-900/60 px-6 py-10 text-center transition-colors hover:border-primary-500 hover:bg-surface-900"
+        class="flex cursor-pointer flex-col items-center gap-1 rounded-container border border-dashed border-surface-700 px-6 py-12 text-center transition-colors hover:border-primary-500"
       >
-        <span class="font-medium text-surface-100">
+        <span class="text-surface-200">
           {fileName ?? "أسقط ملف PDF أو ملف صوتي هنا، أو انقر للتصفح"}
         </span>
-        <span class="text-sm text-surface-400">
+        <span class="text-sm text-surface-500">
           صفحات PDF الممسوحة ضوئياً أو ملفات صوتية (mp3, wav, m4a, flac).
         </span>
         <input
@@ -87,7 +79,11 @@
         />
       </label>
       <div class="mt-4 flex justify-center">
-        <button type="submit" class="btn preset-filled-primary-500" disabled={uploading}>
+        <button
+          type="submit"
+          class="btn-seal"
+          disabled={uploading}
+        >
           {uploading ? "جاري الرفع…" : "رفع"}
         </button>
       </div>
@@ -98,56 +94,43 @@
   </section>
 
   <section>
-    <div class="jadwal-rule mb-3 flex items-center justify-between pb-3">
-      <h2 class="font-heading text-xl font-bold text-primary-300">الرف الخاص بك</h2>
-      <span class="font-mono-data text-xs text-surface-400">
+    <div class="rubric-rule mb-1 flex items-end justify-between border-b pb-3">
+      <h2 class="font-heading text-lg text-surface-200">الرف الخاص بك</h2>
+      <span class="font-mono-data text-xs text-surface-500">
         {jobs.length}
         {jobs.length === 1 ? "مخطوطة" : "مخطوطات"}
       </span>
     </div>
 
     {#if jobs.length === 0}
-      <div class="card bg-surface-900 p-6 text-center text-surface-400">
+      <p class="py-8 text-center text-sm text-surface-500">
         الرف فارغ — ابدأ برفع مخطوطة في الأعلى.
-      </div>
+      </p>
     {:else}
-      <ul class="space-y-3">
+      <ul>
         {#each jobs as job (job.id)}
-          <li
-            class="card relative border border-surface-800 bg-surface-900 p-4 transition-colors hover:bg-surface-800"
-          >
-            <div class="flex items-start justify-between gap-4">
-              <div class="min-w-0">
-                <a href="/jobs/{job.id}" class="static after:absolute after:inset-0">
-                  <p dir="auto" class="font-heading truncate text-start text-lg font-bold text-surface-50">
-                    {job.title ?? job.sha256.slice(0, 12)}
-                  </p>
-                </a>
-                <p class="font-mono-data mt-1 text-sm text-surface-400">
-                  {job.mistral_units_processed ?? job.source_units} وحدة · حُدث {updatedAgo(
-                    job.updated_at,
-                  )}
+          <li class="group relative flex items-center justify-between gap-4 border-b border-surface-800 py-4">
+            <div class="min-w-0">
+              <a href="/jobs/{job.id}" class="static after:absolute after:inset-0">
+                <p dir="auto" class="font-heading truncate text-start text-base text-surface-50">
+                  {job.title ?? job.sha256.slice(0, 12)}
                 </p>
-              </div>
-              <div class="relative z-10 flex shrink-0 items-center gap-2">
-                {#if job.status === "done"}
-                  <span class="badge preset-tonal-success text-xs">مكتمل</span>
-                  <a
-                    href="/jobs/{job.id}/docx"
-                    class="btn-icon preset-tonal-primary"
-                    title="تحميل .docx"
-                    aria-label="تحميل .docx"
-                  >
-                    ↓
-                  </a>
-                {:else if job.status === "failed"}
-                  <span class="badge preset-tonal-error text-xs">فشل</span>
-                {:else}
-                  <span class="badge-dot preset-tonal-primary text-xs">
-                    {statusLabel(job)}
-                  </span>
-                {/if}
-              </div>
+              </a>
+              <p class="font-mono-data mt-1 text-xs text-surface-500">
+                {job.mistral_units_processed ?? job.source_units} وحدة · حُدث {updatedAgo(job.updated_at)}
+              </p>
+            </div>
+            <div class="relative z-10 flex shrink-0 items-center gap-4">
+              <JobStatus {job} />
+              {#if job.status === "done"}
+                <a
+                  href="/jobs/{job.id}/docx"
+                  class="text-sm text-surface-400 underline underline-offset-2 transition-colors hover:text-primary-300"
+                  title="تحميل .docx"
+                >
+                  تحميل
+                </a>
+              {/if}
             </div>
           </li>
         {/each}

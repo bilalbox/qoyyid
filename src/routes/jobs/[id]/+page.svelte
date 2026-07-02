@@ -1,6 +1,7 @@
 <script lang="ts">
   import { isTerminal } from "$lib/api";
   import { invalidateAll } from "$app/navigation";
+  import JobStatus from "$lib/components/JobStatus.svelte";
   import type { PageProps } from "./$types";
 
   let { data }: PageProps = $props();
@@ -13,55 +14,42 @@
     }, 5000);
     return () => clearInterval(interval);
   });
-
-  function statusLabel(): string {
-    if (job.status === "batch_submitted" || job.status === "batch_running") {
-      return "قيد المعالجة";
-    }
-    if (job.status === "uploaded") return "مرفوع";
-    if (job.status === "mapping") return "قيد المعالجة";
-    return job.status;
-  }
 </script>
 
-<div class="mx-auto max-w-3xl px-6 py-10">
-  <p class="mb-6">
-    <a href="/" class="text-sm text-surface-400 hover:text-primary-300">&rarr; العودة إلى الرف</a>
+<div class="mx-auto max-w-2xl px-6 py-12">
+  <p class="mb-8">
+    <a href="/" class="text-sm text-surface-500 hover:text-primary-300">&rarr; العودة إلى الرف</a>
   </p>
 
-  <h1 dir="auto" class="font-heading text-start text-3xl font-bold text-primary-300">
+  <h1 dir="auto" class="font-heading text-start text-2xl text-surface-50">
     {job.title ?? job.sha256.slice(0, 12)}
   </h1>
 
-  <div class="card jadwal-rule mt-6 divide-y divide-surface-800 bg-surface-900">
-    <div class="flex items-center justify-between p-4">
-      <span class="text-sm text-surface-400">الحالة</span>
-      <div class="flex items-center gap-2">
-        {#if job.status === "done"}
-          <span class="badge preset-tonal-success text-xs">مكتمل</span>
-        {:else if job.status === "failed"}
-          <span class="badge preset-tonal-error text-xs">فشل</span>
-        {:else}
-          <span class="badge-dot preset-tonal-primary text-xs">{statusLabel()}</span>
-          <span class="text-xs text-surface-500">لا يوجد وقت محدد — قد يستغرق دقائق أو ساعات</span>
-        {/if}
-      </div>
+  <div class="mt-8">
+    <div class="flex items-center justify-between border-b border-surface-800 py-3">
+      <span class="text-sm text-surface-500">الحالة</span>
+      <JobStatus {job} hint />
     </div>
-    <div class="flex items-center justify-between p-4">
-      <span class="text-sm text-surface-400">الوحدات</span>
+    <div class="flex items-center justify-between border-b border-surface-800 py-3">
+      <span class="text-sm text-surface-500">الوحدات</span>
       <span class="font-mono-data text-sm text-surface-100">
         {job.mistral_units_processed ?? job.source_units}
       </span>
     </div>
     {#if job.error}
-      <div class="flex items-center justify-between p-4">
-        <span class="text-sm text-surface-400">الخطأ</span>
+      <div class="flex items-center justify-between border-b border-surface-800 py-3">
+        <span class="text-sm text-surface-500">الخطأ</span>
         <span class="text-sm text-error-400">{job.error}</span>
       </div>
     {/if}
   </div>
 
   {#if job.status === "done"}
-    <a href="/jobs/{job.id}/docx" class="btn preset-filled-primary-500 mt-6"> تحميل .docx </a>
+    <a
+      href="/jobs/{job.id}/docx"
+      class="btn-seal mt-8 inline-block"
+    >
+      تحميل .docx
+    </a>
   {/if}
 </div>

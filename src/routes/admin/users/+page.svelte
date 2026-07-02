@@ -39,9 +39,9 @@
   <p class="mb-4 text-sm text-error-400">{saveError}</p>
 {/if}
 
-<div class="card jadwal-rule overflow-x-auto bg-surface-900">
+<div class="overflow-x-auto">
   <table class="w-full text-start text-sm">
-    <thead class="jadwal-rule text-xs text-surface-400">
+    <thead class="rubric-rule border-b text-xs text-surface-500">
       <tr>
         <th class="px-4 py-3 font-medium">البريد الإلكتروني</th>
         <th class="px-4 py-3 font-medium">الدور</th>
@@ -57,16 +57,16 @@
           <td class="px-4 py-3 text-surface-100">{user.email}</td>
           <td class="px-4 py-3">
             {#if user.is_admin}
-              <span class="badge preset-tonal-primary text-xs">مسؤول</span>
+              <span class="text-xs text-primary-300">مسؤول</span>
             {:else}
-              <span class="text-surface-500">—</span>
+              <span class="text-surface-600">—</span>
             {/if}
           </td>
           <td class="font-mono-data px-4 py-3 text-surface-300">
             {user.quota_pages_used}/{user.quota_pages_limit} وحدة
           </td>
           <td class="font-mono-data px-4 py-3 text-surface-300">{user.job_count}</td>
-          <td class="font-mono-data px-4 py-3 text-surface-400">{user.created_at}</td>
+          <td class="font-mono-data px-4 py-3 text-surface-500">{user.created_at}</td>
           <td class="px-4 py-3">
             <form class="flex items-center gap-2" onsubmit={(e) => (e.preventDefault(), saveQuota(user))}>
               <input
@@ -74,11 +74,11 @@
                 min="0"
                 value={draftFor(user)}
                 oninput={(e) => (quotaDrafts[user.id] = e.currentTarget.value)}
-                class="input font-mono-data w-24 bg-surface-950 px-2 py-1 text-sm"
+                class="input font-mono-data w-24 border-surface-700 bg-transparent px-2 py-1 text-sm"
               />
               <button
                 type="submit"
-                class="btn preset-tonal-primary btn-sm"
+                class="text-sm text-surface-400 underline underline-offset-2 hover:text-primary-300 disabled:opacity-50"
                 disabled={saving === user.id}
               >
                 {saving === user.id ? "جاري الحفظ…" : "حفظ"}

@@ -85,7 +85,16 @@ app.post("/jobs", (c) => handleCreateJob(c.req.raw, c.env, c.executionCtx, c.get
 app.post("/jobs/audio-upload", (c) => handleCreateAudioUpload(c.req.raw, c.env, c.get("user")));
 app.post("/jobs/:id/start-audio", (c) => handleStartAudioJob(c.env, c.executionCtx, c.get("user"), c.req.param("id")));
 app.get("/jobs", (c) => handleListJobs(c.env, c.get("user")));
-app.get("/jobs/:id", (c) => handleGetJob(c.env, c.get("user"), c.req.param("id")));
+// /jobs/:id is also the SvelteKit job-detail page's URL, and run_worker_first
+// routes that path here before the asset binding ever sees it. Browser
+// navigations (e.g. clicking an FCM notification, which opens this URL via
+// clients.openWindow) ask for text/html; the SPA's own client-side fetch for
+// job data asks for JSON. Without this check every navigation here got the
+// raw JSON response instead of the HTML job page.
+app.get("/jobs/:id", (c) => {
+  if ((c.req.header("accept") ?? "").includes("text/html")) return c.env.ASSETS.fetch(c.req.raw);
+  return handleGetJob(c.env, c.get("user"), c.req.param("id"));
+});
 app.get("/jobs/:id/docx", (c) => handleGetDocx(c.env, c.get("user"), c.req.param("id")));
 app.get("/jobs/:id/document", (c) => handleGetDocument(c.env, c.get("user"), c.req.param("id")));
 

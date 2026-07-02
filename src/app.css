@@ -1,20 +1,247 @@
 @import "tailwindcss";
 @import "@skeletonlabs/skeleton";
 @import "@skeletonlabs/skeleton-svelte";
-@import "@skeletonlabs/skeleton/themes/pine";
 
 @import "@fontsource/reem-kufi/latin-700.css";
 @import "@fontsource/reem-kufi/latin-400.css";
+@import "@fontsource/reem-kufi/latin-500.css";
 @import "@fontsource-variable/vazirmatn";
 @import "@fontsource/ibm-plex-mono/latin-400.css";
 @import "@fontsource/ibm-plex-mono/latin-500.css";
 
 @source "../node_modules/@skeletonlabs/skeleton-svelte/dist";
 
-/* Arabic-friendly typefaces layered onto the pine theme's palette. */
-[data-theme="pine"] {
+/**
+ * "qoyyid" — a custom Skeleton v4 theme, written directly rather than
+ * patching a preset. The page is a manuscript accession ledger: warm
+ * near-black ink instead of a neutral slate dark mode, and a single
+ * accent — "rubric" — named for the red ink scribes used for section
+ * headings and margin correction-marks. Rubric is reserved strictly for
+ * structure (rules, focus, in-progress marks) and never used as button
+ * fill color, so it stays legible as a signal rather than decoration.
+ */
+[data-theme="qoyyid"] {
+  --text-scaling: 1;
+  --base-font-color: var(--color-surface-950);
+  --base-font-color-dark: var(--color-surface-50);
   --base-font-family: "Vazirmatn Variable", sans-serif;
+  --base-font-size: inherit;
+  --base-line-height: 1.6;
+  --base-font-weight: normal;
+  --base-font-style: normal;
+  --base-letter-spacing: 0em;
+  --heading-font-color: var(--color-primary-700);
+  --heading-font-color-dark: var(--color-surface-50);
   --heading-font-family: "Reem Kufi", sans-serif;
+  --heading-font-weight: 500;
+  --heading-font-style: normal;
+  --heading-letter-spacing: 0em;
+  --anchor-font-color: var(--color-primary-600);
+  --anchor-font-color-dark: var(--color-primary-300);
+  --anchor-font-family: inherit;
+  --anchor-font-size: inherit;
+  --anchor-line-height: inherit;
+  --anchor-font-weight: normal;
+  --anchor-font-style: normal;
+  --anchor-letter-spacing: inherit;
+  --anchor-text-decoration: none;
+  --anchor-text-decoration-hover: underline;
+  --anchor-text-decoration-active: none;
+  --anchor-text-decoration-focus: none;
+  --spacing: 0.25rem;
+  --radius-base: 0.25rem;
+  --radius-container: 0.5rem;
+  --default-border-width: 1px;
+  --default-divide-width: 1px;
+  --default-ring-width: 1px;
+  --body-background-color: var(--color-surface-50);
+  --body-background-color-dark: var(--color-surface-950);
+
+  /* primary — "rubric": desaturated crimson, structural accent only */
+  --color-primary-50: oklch(90% 0.035 26deg);
+  --color-primary-100: oklch(84% 0.05 25deg);
+  --color-primary-200: oklch(76% 0.08 24deg);
+  --color-primary-300: oklch(68% 0.11 23deg);
+  --color-primary-400: oklch(60% 0.13 21deg);
+  --color-primary-500: oklch(52% 0.15 19deg);
+  --color-primary-600: oklch(46% 0.14 18deg);
+  --color-primary-700: oklch(40% 0.13 17deg);
+  --color-primary-800: oklch(34% 0.11 16deg);
+  --color-primary-900: oklch(28% 0.09 15deg);
+  --color-primary-950: oklch(22% 0.07 14deg);
+  --color-primary-contrast-dark: oklch(0% 0 none);
+  --color-primary-contrast-light: oklch(100% 0 none);
+  --color-primary-contrast-50: var(--color-primary-contrast-dark);
+  --color-primary-contrast-100: var(--color-primary-contrast-dark);
+  --color-primary-contrast-200: var(--color-primary-contrast-dark);
+  --color-primary-contrast-300: var(--color-primary-contrast-dark);
+  --color-primary-contrast-400: var(--color-primary-contrast-light);
+  --color-primary-contrast-500: var(--color-primary-contrast-light);
+  --color-primary-contrast-600: var(--color-primary-contrast-light);
+  --color-primary-contrast-700: var(--color-primary-contrast-light);
+  --color-primary-contrast-800: var(--color-primary-contrast-light);
+  --color-primary-contrast-900: var(--color-primary-contrast-light);
+  --color-primary-contrast-950: var(--color-primary-contrast-light);
+
+  /* secondary — muted ochre, held in reserve (echo of the old gilding, unused by default) */
+  --color-secondary-50: oklch(90% 0.03 78deg);
+  --color-secondary-100: oklch(83% 0.05 78deg);
+  --color-secondary-200: oklch(75% 0.06 78deg);
+  --color-secondary-300: oklch(67% 0.07 78deg);
+  --color-secondary-400: oklch(59% 0.07 78deg);
+  --color-secondary-500: oklch(51% 0.07 78deg);
+  --color-secondary-600: oklch(45% 0.06 78deg);
+  --color-secondary-700: oklch(39% 0.06 78deg);
+  --color-secondary-800: oklch(33% 0.05 78deg);
+  --color-secondary-900: oklch(27% 0.04 78deg);
+  --color-secondary-950: oklch(21% 0.03 78deg);
+  --color-secondary-contrast-dark: oklch(0% 0 none);
+  --color-secondary-contrast-light: oklch(100% 0 none);
+  --color-secondary-contrast-50: var(--color-secondary-contrast-dark);
+  --color-secondary-contrast-100: var(--color-secondary-contrast-dark);
+  --color-secondary-contrast-200: var(--color-secondary-contrast-dark);
+  --color-secondary-contrast-300: var(--color-secondary-contrast-dark);
+  --color-secondary-contrast-400: var(--color-secondary-contrast-light);
+  --color-secondary-contrast-500: var(--color-secondary-contrast-light);
+  --color-secondary-contrast-600: var(--color-secondary-contrast-light);
+  --color-secondary-contrast-700: var(--color-secondary-contrast-light);
+  --color-secondary-contrast-800: var(--color-secondary-contrast-light);
+  --color-secondary-contrast-900: var(--color-secondary-contrast-light);
+  --color-secondary-contrast-950: var(--color-secondary-contrast-light);
+
+  /* tertiary — muted teal-ink, held in reserve */
+  --color-tertiary-50: oklch(88% 0.03 195deg);
+  --color-tertiary-100: oklch(80% 0.04 195deg);
+  --color-tertiary-200: oklch(72% 0.05 195deg);
+  --color-tertiary-300: oklch(64% 0.06 195deg);
+  --color-tertiary-400: oklch(56% 0.06 195deg);
+  --color-tertiary-500: oklch(48% 0.06 195deg);
+  --color-tertiary-600: oklch(42% 0.05 195deg);
+  --color-tertiary-700: oklch(36% 0.05 195deg);
+  --color-tertiary-800: oklch(30% 0.04 195deg);
+  --color-tertiary-900: oklch(25% 0.03 195deg);
+  --color-tertiary-950: oklch(20% 0.03 195deg);
+  --color-tertiary-contrast-dark: oklch(0% 0 none);
+  --color-tertiary-contrast-light: oklch(100% 0 none);
+  --color-tertiary-contrast-50: var(--color-tertiary-contrast-dark);
+  --color-tertiary-contrast-100: var(--color-tertiary-contrast-dark);
+  --color-tertiary-contrast-200: var(--color-tertiary-contrast-dark);
+  --color-tertiary-contrast-300: var(--color-tertiary-contrast-dark);
+  --color-tertiary-contrast-400: var(--color-tertiary-contrast-light);
+  --color-tertiary-contrast-500: var(--color-tertiary-contrast-light);
+  --color-tertiary-contrast-600: var(--color-tertiary-contrast-light);
+  --color-tertiary-contrast-700: var(--color-tertiary-contrast-light);
+  --color-tertiary-contrast-800: var(--color-tertiary-contrast-light);
+  --color-tertiary-contrast-900: var(--color-tertiary-contrast-light);
+  --color-tertiary-contrast-950: var(--color-tertiary-contrast-light);
+
+  /* success — muted sage */
+  --color-success-50: oklch(90% 0.04 150deg);
+  --color-success-100: oklch(83% 0.05 150deg);
+  --color-success-200: oklch(75% 0.06 150deg);
+  --color-success-300: oklch(67% 0.07 150deg);
+  --color-success-400: oklch(59% 0.08 150deg);
+  --color-success-500: oklch(51% 0.08 150deg);
+  --color-success-600: oklch(45% 0.07 150deg);
+  --color-success-700: oklch(39% 0.06 150deg);
+  --color-success-800: oklch(33% 0.05 150deg);
+  --color-success-900: oklch(27% 0.04 150deg);
+  --color-success-950: oklch(21% 0.03 150deg);
+  --color-success-contrast-dark: oklch(0% 0 none);
+  --color-success-contrast-light: oklch(100% 0 none);
+  --color-success-contrast-50: var(--color-success-contrast-dark);
+  --color-success-contrast-100: var(--color-success-contrast-dark);
+  --color-success-contrast-200: var(--color-success-contrast-dark);
+  --color-success-contrast-300: var(--color-success-contrast-dark);
+  --color-success-contrast-400: var(--color-success-contrast-light);
+  --color-success-contrast-500: var(--color-success-contrast-light);
+  --color-success-contrast-600: var(--color-success-contrast-light);
+  --color-success-contrast-700: var(--color-success-contrast-light);
+  --color-success-contrast-800: var(--color-success-contrast-light);
+  --color-success-contrast-900: var(--color-success-contrast-light);
+  --color-success-contrast-950: var(--color-success-contrast-light);
+
+  /* warning — muted amber */
+  --color-warning-50: oklch(93% 0.05 80deg);
+  --color-warning-100: oklch(87% 0.07 80deg);
+  --color-warning-200: oklch(80% 0.09 80deg);
+  --color-warning-300: oklch(73% 0.1 80deg);
+  --color-warning-400: oklch(66% 0.11 80deg);
+  --color-warning-500: oklch(59% 0.11 80deg);
+  --color-warning-600: oklch(52% 0.1 80deg);
+  --color-warning-700: oklch(45% 0.09 80deg);
+  --color-warning-800: oklch(38% 0.07 80deg);
+  --color-warning-900: oklch(31% 0.05 80deg);
+  --color-warning-950: oklch(24% 0.04 80deg);
+  --color-warning-contrast-dark: oklch(0% 0 none);
+  --color-warning-contrast-light: oklch(100% 0 none);
+  --color-warning-contrast-50: var(--color-warning-contrast-dark);
+  --color-warning-contrast-100: var(--color-warning-contrast-dark);
+  --color-warning-contrast-200: var(--color-warning-contrast-dark);
+  --color-warning-contrast-300: var(--color-warning-contrast-dark);
+  --color-warning-contrast-400: var(--color-warning-contrast-dark);
+  --color-warning-contrast-500: var(--color-warning-contrast-light);
+  --color-warning-contrast-600: var(--color-warning-contrast-light);
+  --color-warning-contrast-700: var(--color-warning-contrast-light);
+  --color-warning-contrast-800: var(--color-warning-contrast-light);
+  --color-warning-contrast-900: var(--color-warning-contrast-light);
+  --color-warning-contrast-950: var(--color-warning-contrast-light);
+
+  /* error — orange-red, offset in hue from primary so it never reads as "just another rubric mark" */
+  --color-error-50: oklch(90% 0.05 40deg);
+  --color-error-100: oklch(84% 0.08 40deg);
+  --color-error-200: oklch(76% 0.11 39deg);
+  --color-error-300: oklch(69% 0.14 38deg);
+  --color-error-400: oklch(62% 0.16 37deg);
+  --color-error-500: oklch(55% 0.17 36deg);
+  --color-error-600: oklch(48% 0.15 35deg);
+  --color-error-700: oklch(41% 0.13 34deg);
+  --color-error-800: oklch(34% 0.11 33deg);
+  --color-error-900: oklch(28% 0.08 32deg);
+  --color-error-950: oklch(22% 0.06 31deg);
+  --color-error-contrast-dark: oklch(0% 0 none);
+  --color-error-contrast-light: oklch(100% 0 none);
+  --color-error-contrast-50: var(--color-error-contrast-dark);
+  --color-error-contrast-100: var(--color-error-contrast-dark);
+  --color-error-contrast-200: var(--color-error-contrast-dark);
+  --color-error-contrast-300: var(--color-error-contrast-dark);
+  --color-error-contrast-400: var(--color-error-contrast-light);
+  --color-error-contrast-500: var(--color-error-contrast-light);
+  --color-error-contrast-600: var(--color-error-contrast-light);
+  --color-error-contrast-700: var(--color-error-contrast-light);
+  --color-error-contrast-800: var(--color-error-contrast-light);
+  --color-error-contrast-900: var(--color-error-contrast-light);
+  --color-error-contrast-950: var(--color-error-contrast-light);
+
+  /*
+   * surface — "ink" (dark end) to "parchment" (light end). Warm near-neutral
+   * with a faint low-chroma cast rather than a cold slate gray, so the dark
+   * background reads as ink on paper rather than a generic app shell.
+   */
+  --color-surface-50: oklch(93% 0.018 80deg);
+  --color-surface-100: oklch(88% 0.017 78deg);
+  --color-surface-200: oklch(80% 0.015 75deg);
+  --color-surface-300: oklch(72% 0.014 72deg);
+  --color-surface-400: oklch(63% 0.012 68deg);
+  --color-surface-500: oklch(54% 0.011 65deg);
+  --color-surface-600: oklch(45% 0.01 62deg);
+  --color-surface-700: oklch(36% 0.01 60deg);
+  --color-surface-800: oklch(28% 0.009 58deg);
+  --color-surface-900: oklch(21% 0.008 56deg);
+  --color-surface-950: oklch(15% 0.007 55deg);
+  --color-surface-contrast-dark: var(--color-surface-950);
+  --color-surface-contrast-light: var(--color-surface-50);
+  --color-surface-contrast-50: var(--color-surface-contrast-dark);
+  --color-surface-contrast-100: var(--color-surface-contrast-dark);
+  --color-surface-contrast-200: var(--color-surface-contrast-dark);
+  --color-surface-contrast-300: var(--color-surface-contrast-dark);
+  --color-surface-contrast-400: var(--color-surface-contrast-light);
+  --color-surface-contrast-500: var(--color-surface-contrast-light);
+  --color-surface-contrast-600: var(--color-surface-contrast-light);
+  --color-surface-contrast-700: var(--color-surface-contrast-light);
+  --color-surface-contrast-800: var(--color-surface-contrast-light);
+  --color-surface-contrast-900: var(--color-surface-contrast-light);
+  --color-surface-contrast-950: var(--color-surface-contrast-light);
 }
 
 /**
@@ -30,48 +257,67 @@ html {
 }
 
 /**
- * The "jadwal" rule — the manuscript folio's ruled border, reused as the
- * page's single recurring divider motif (header, dropzone, card headers,
- * table heads). Pine's --color-secondary-* is a maroon/rose hue reserved
- * strictly for destructive actions, so the rule is drawn in primary (gold)
- * instead — it's a mark of structure, not of danger.
+ * The "rubric" rule — the manuscript ledger's ruled line, drawn in the
+ * accent reserved for structure. Used as the page's only recurring divider:
+ * header, ledger rows, table heads. Faint by default so it reads as a
+ * ruling, not a border.
  */
-.jadwal-rule {
-  border-bottom: 1px solid color-mix(in oklch, var(--color-primary-400) 45%, transparent);
-  box-shadow: 0 1px 0 0 var(--color-surface-950);
+.rubric-rule {
+  border-color: color-mix(in oklch, var(--color-primary-500) 40%, transparent);
 }
 
 /**
- * A processing-status pill with a pulsing dot — badge-dot isn't a Skeleton
- * utility, so the dot itself is drawn here rather than assumed from Tailwind.
+ * The scribe's margin mark: a slim vertical rubric tick used in place of a
+ * colored status pill to flag a ledger row that's still being processed.
  */
-.badge-dot {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4em;
-  border-radius: var(--radius-base);
-  padding-block: calc(var(--spacing) * 1);
-  padding-inline: calc(var(--spacing) * 3);
+.rubric-mark {
+  position: relative;
 }
-.badge-dot::before {
+.rubric-mark::before {
   content: "";
-  width: 0.5em;
-  height: 0.5em;
+  position: absolute;
+  inset-inline-start: -1rem;
+  top: 0.2em;
+  bottom: 0.2em;
+  width: 2px;
   border-radius: 999px;
-  background-color: currentColor;
-  animation: badge-dot-pulse 1.6s ease-in-out infinite;
+  background-color: var(--color-primary-400);
+  animation: rubric-mark-pulse 1.8s ease-in-out infinite;
 }
-@keyframes badge-dot-pulse {
+@keyframes rubric-mark-pulse {
   0%, 100% {
     opacity: 1;
   }
   50% {
-    opacity: 0.35;
+    opacity: 0.4;
   }
+}
+
+/**
+ * The seal: the page's one filled control, a light stamp on dark ink rather
+ * than a colored button, so rubric red stays reserved for structure.
+ */
+.btn-seal {
+  border-radius: var(--radius-base);
+  background-color: var(--color-surface-50);
+  padding-inline: calc(var(--spacing) * 5);
+  padding-block: calc(var(--spacing) * 2);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-surface-950);
+  transition: opacity 150ms ease;
+}
+.btn-seal:hover {
+  opacity: 0.9;
+}
+.btn-seal:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .font-mono-data {
   font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
 }
 
 .font-heading {

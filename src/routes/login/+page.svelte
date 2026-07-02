@@ -48,9 +48,9 @@
 </svelte:head>
 
 <div class="flex min-h-screen items-center justify-center bg-surface-950 px-6">
-  <div class="card jadwal-rule w-full max-w-sm bg-surface-900 p-8 text-center shadow-xl shadow-black/40">
-    <p class="font-heading text-3xl font-bold tracking-wide text-primary-300">قيد</p>
-      حول المخطوطات إلى نصوص منظمة وقابلة للتحرير.
+  <div class="w-full max-w-sm text-center">
+    <p class="font-heading text-2xl tracking-wide text-surface-50">قيد</p>
+    <p class="mt-2 text-sm text-surface-500">حول المخطوطات إلى نصوص منظمة وقابلة للتحرير.</p>
 
     {#if error === "invite_required"}
       <p class="mt-6 text-sm text-error-400">
@@ -79,7 +79,7 @@
     <button
       onclick={signIn}
       disabled={!turnstileToken || verifying}
-      class="btn preset-filled-primary-500 mt-6 w-full disabled:cursor-not-allowed disabled:opacity-50"
+      class="btn-seal mt-8 w-full"
     >
       تسجيل الدخول عبر جوجل
     </button>

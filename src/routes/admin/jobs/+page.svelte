@@ -30,9 +30,9 @@
   <p class="mb-4 text-sm text-error-400">{error}</p>
 {/if}
 
-<div class="card jadwal-rule overflow-x-auto bg-surface-900">
+<div class="overflow-x-auto">
   <table class="w-full text-start text-sm">
-    <thead class="jadwal-rule text-xs text-surface-400">
+    <thead class="rubric-rule border-b text-xs text-surface-500">
       <tr>
         <th class="px-4 py-3 font-medium">العنوان</th>
         <th class="px-4 py-3 font-medium">المستخدم</th>
@@ -51,14 +51,14 @@
           <td class="px-4 py-3 text-surface-300">{job.user_email}</td>
           <td class="px-4 py-3">
             {#if job.status === "done"}
-              <span class="badge preset-tonal-success text-xs">مكتمل</span>
+              <span class="text-xs text-success-400">مكتمل</span>
             {:else if job.status === "failed"}
-              <span class="badge preset-tonal-error text-xs" title={job.error ?? ""}>فشل</span>
+              <span class="text-xs text-error-400" title={job.error ?? ""}>فشل</span>
             {:else}
-              <span class="badge-dot preset-tonal-primary text-xs">{job.status}</span>
+              <span class="rubric-mark me-4 text-xs text-primary-300">{job.status}</span>
             {/if}
           </td>
-          <td class="font-mono-data px-4 py-3 text-surface-400">{job.created_at}</td>
+          <td class="font-mono-data px-4 py-3 text-surface-500">{job.created_at}</td>
           <td class="px-4 py-3 whitespace-nowrap">
             <span class="flex gap-3 text-xs">
               {#if job.available.pdf}
@@ -88,10 +88,10 @@
             </span>
           </td>
           <td class="px-4 py-3 whitespace-nowrap">
-            <div class="flex gap-2">
+            <div class="flex gap-4 text-sm">
               <button
                 type="button"
-                class="btn preset-tonal-primary btn-sm"
+                class="text-surface-400 underline underline-offset-2 hover:text-primary-300 disabled:opacity-50"
                 disabled={!job.available.response || busy === `${job.id}:document`}
                 title={job.available.response ? "" : "لا توجد استجابة Mistral محفوظة لهذا الطلب"}
                 onclick={() => run("document", job)}
@@ -100,7 +100,7 @@
               </button>
               <button
                 type="button"
-                class="btn preset-tonal-primary btn-sm"
+                class="text-surface-400 underline underline-offset-2 hover:text-primary-300 disabled:opacity-50"
                 disabled={!job.available.document || busy === `${job.id}:docx`}
                 title={job.available.document ? "" : "لا يوجد document.json محفوظ لهذا الطلب"}
                 onclick={() => run("docx", job)}
