@@ -128,6 +128,7 @@ export async function finalizeJob(env: Env, jobId: string, batchStatus: MistralB
     await putBytes(env.BUCKET, keys.docx, docx, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
 
     const usageKind = row.modality === "audio" ? "asr_minutes" : "ocr_pages";
+    const quotaColumn = row.modality === "audio" ? "quota_minutes_used" : "quota_pages_used";
 
     await env.DB.batch([
       env.DB.prepare(
@@ -136,7 +137,7 @@ export async function finalizeJob(env: Env, jobId: string, batchStatus: MistralB
       env.DB.prepare(
         `INSERT INTO usage_events (id, user_id, job_id, kind, quantity) SELECT lower(hex(randomblob(16))), user_id, ?, ?, ? FROM jobs WHERE id = ?`,
       ).bind(jobId, usageKind, unitsProcessed, jobId),
-      env.DB.prepare(`UPDATE users SET quota_pages_used = quota_pages_used + ? WHERE id = (SELECT user_id FROM jobs WHERE id = ?)`).bind(
+      env.DB.prepare(`UPDATE users SET ${quotaColumn} = ${quotaColumn} + ? WHERE id = (SELECT user_id FROM jobs WHERE id = ?)`).bind(
         unitsProcessed,
         jobId,
       ),

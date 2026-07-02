@@ -217,9 +217,13 @@ admin.post("/admin/api/jobs/:id/reproduce-document", async (c) => {
       c.env.DB.prepare(
         `INSERT INTO usage_events (id, user_id, job_id, kind, quantity) SELECT lower(hex(randomblob(16))), user_id, ?, ?, ? FROM jobs WHERE id = ?`,
       ).bind(jobId, usageKind, build.unitsProcessed, jobId),
-      c.env.DB.prepare(
-        `UPDATE users SET quota_pages_used = quota_pages_used + ? WHERE id = (SELECT user_id FROM jobs WHERE id = ?)`,
-      ).bind(build.unitsProcessed, jobId),
+      row.modality === "audio"
+        ? c.env.DB.prepare(
+            `UPDATE users SET quota_minutes_used = quota_minutes_used + ? WHERE id = (SELECT user_id FROM jobs WHERE id = ?)`,
+          ).bind(build.unitsProcessed, jobId)
+        : c.env.DB.prepare(
+            `UPDATE users SET quota_pages_used = quota_pages_used + ? WHERE id = (SELECT user_id FROM jobs WHERE id = ?)`,
+          ).bind(build.unitsProcessed, jobId),
     );
   }
   await c.env.DB.batch(statements as Parameters<typeof c.env.DB.batch>[0]);

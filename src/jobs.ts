@@ -14,17 +14,25 @@ function titleFromFilename(filename: string): string {
   return filename.replace(/\.[^.]+$/, "").trim() || filename;
 }
 
-async function findExistingJob(env: Env, sha256: string, userId: string): Promise<{ id: string; status: string } | null> {
+async function findExistingJob(
+  env: Env,
+  sha256: string,
+  userId: string,
+  modality: "pdf" | "audio",
+): Promise<{ id: string; status: string } | null> {
   return env.DB.prepare(
-    "SELECT id, status FROM jobs WHERE sha256 = ? AND user_id = ? ORDER BY created_at DESC LIMIT 1",
+    "SELECT id, status FROM jobs WHERE sha256 = ? AND user_id = ? AND modality = ? ORDER BY created_at DESC LIMIT 1",
   )
-    .bind(sha256, userId)
+    .bind(sha256, userId, modality)
     .first<{ id: string; status: string }>();
 }
 
 // Quota is only checked once we know this isn't a free dedup hit — a user
 // whose quota is exhausted can still re-fetch a document they already paid for.
-function quotaExceeded(user: User): boolean {
+function quotaExceeded(user: User, modality: "pdf" | "audio"): boolean {
+  if (modality === "audio") {
+    return user.quota_minutes_used >= user.quota_minutes_limit;
+  }
   return user.quota_pages_used >= user.quota_pages_limit;
 }
 
@@ -53,13 +61,13 @@ export async function handleCreateJob(
 
   const sha256 = await sha256Hex(bytes);
   const fileKey = uploadFileKey(sha256);
-  const existing = await findExistingJob(env, sha256, user.id);
+  const existing = await findExistingJob(env, sha256, user.id, "pdf");
 
   if (existing && existing.status !== "failed") {
     return json({ job_id: existing.id, sha256, status: existing.status, deduplicated: true }, 200);
   }
 
-  if (quotaExceeded(user)) {
+  if (quotaExceeded(user, "pdf")) {
     return json({ error: "quota exceeded", quota_pages_limit: user.quota_pages_limit }, 402);
   }
 
@@ -180,14 +188,14 @@ export async function handleCreateAudioUpload(
   }
 
   const fileKey = uploadFileKey(sha256, extension);
-  const existing = await findExistingJob(env, sha256, user.id);
+  const existing = await findExistingJob(env, sha256, user.id, "audio");
 
   if (existing && existing.status !== "failed") {
     return json({ job_id: existing.id, sha256, status: existing.status, deduplicated: true }, 200);
   }
 
-  if (quotaExceeded(user)) {
-    return json({ error: "quota exceeded", quota_pages_limit: user.quota_pages_limit }, 402);
+  if (quotaExceeded(user, "audio")) {
+    return json({ error: "quota exceeded", quota_minutes_limit: user.quota_minutes_limit }, 402);
   }
 
   const jobId = newJobId();

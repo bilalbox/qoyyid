@@ -52,8 +52,16 @@ app.use("/admin/*", requireAuth, requireAdmin);
 app.route("/", admin);
 
 app.get("/me", (c) => {
-  const { id, email, is_admin, quota_pages_limit, quota_pages_used } = c.get("user");
-  return json({ id, email, is_admin: Boolean(is_admin), quota_pages_limit, quota_pages_used });
+  const { id, email, is_admin, quota_pages_limit, quota_pages_used, quota_minutes_limit, quota_minutes_used } = c.get("user");
+  return json({
+    id,
+    email,
+    is_admin: Boolean(is_admin),
+    quota_pages_limit,
+    quota_pages_used,
+    quota_minutes_limit,
+    quota_minutes_used,
+  });
 });
 
 app.post("/me/fcm-token", async (c) => {
