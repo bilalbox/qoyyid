@@ -1,14 +1,19 @@
 import {
   AlignmentType,
   Document as DocxDocument,
+  FootnoteReferenceRun,
   HeadingLevel,
   Packer,
   PageBreak,
   Paragraph,
+  Table,
+  TableCell,
+  TableRow,
   TextRun,
+  WidthType,
   type IRunOptions,
 } from "docx";
-import { SUPERSCRIPT_MARK_CLOSE, SUPERSCRIPT_MARK_OPEN } from "./mistral-mapping";
+import { digitsToInt, SUPERSCRIPT_MARK_CLOSE, SUPERSCRIPT_MARK_OPEN } from "./mistral-mapping";
 import type { Block, Document, Line, Page } from "./types";
 
 const GAP_RATIO = 1.35;
@@ -26,6 +31,12 @@ const STYLE_SPEC: Record<string, { size: number; bold?: boolean; color?: string;
   footnote: { size: 20, color: "777777", spaceBefore: 16 },
   body: { size: 28 },
   paragraph: { size: 28 },
+  question: { size: 28 },
+  answer: { size: 28 },
+  // Text of a real Word footnote (bottom of page) — smaller like `footnote`,
+  // but normal ink: the grey of the legacy pseudo-footnote paragraphs is for
+  // telling them apart from body text, which real footnotes don't need.
+  footnoteText: { size: 20 },
 };
 
 const BLOCK_STYLE: Record<string, string> = {
@@ -40,6 +51,14 @@ const BLOCK_STYLE: Record<string, string> = {
   footnote: "footnote",
   body: "body",
   paragraph: "paragraph",
+  question: "question",
+  answer: "answer",
+};
+
+// Bold lead-in marking a turn in the question session of a lecture (dars).
+const QA_LEAD_IN: Record<string, string> = {
+  question: "س: ",
+  answer: "ج: ",
 };
 
 const PARA_STYLE: Record<string, string> = {
@@ -49,7 +68,14 @@ const PARA_STYLE: Record<string, string> = {
   footnote: "QoyyidFootnote",
   body: "QoyyidBody",
   paragraph: "QoyyidBody",
+  question: "QoyyidBody",
+  answer: "QoyyidBody",
 };
+
+// Character style for Qur'anic quotations (spans wrapped in ﴾…﴿ ornate
+// brackets, which Mistral OCR preserves) — a named style so the whole
+// register can be restyled in Word in one place.
+const QURAN_CHAR_STYLE = "QoyyidQuran";
 
 const HEADING_LEVEL: Record<string, (typeof HeadingLevel)[keyof typeof HeadingLevel]> = {
   title: HeadingLevel.TITLE,
@@ -59,7 +85,7 @@ const HEADING_LEVEL: Record<string, (typeof HeadingLevel)[keyof typeof HeadingLe
   heading: HeadingLevel.HEADING_1,
 };
 
-const TYPED_ROLES = new Set([...Object.keys(HEADING_LEVEL), ...Object.keys(BLOCK_STYLE)]);
+const TYPED_ROLES = new Set([...Object.keys(HEADING_LEVEL), ...Object.keys(BLOCK_STYLE), "table"]);
 
 function joinWords(parts: string[]): string {
   return parts.map((p) => p.trim()).filter(Boolean).join(" ");
@@ -187,21 +213,70 @@ function splitSuperscriptSegments(text: string): Array<{ text: string; superScri
   return segments.filter((s) => s.text.length > 0);
 }
 
-// Builds the TextRun(s) for a paragraph's text, splitting out any inline
-// footnote references into their own superscript run.
-function runsForText(text: string, styleKey: string): TextRun[] {
+// A Qur'anic quotation span, ornate brackets inclusive: ﴾…﴿ (OCR preserves
+// them; note the brackets arrive in visual order, closing bracket ﴿ first in
+// the logical string is possible — accept either orientation).
+const QURAN_SPAN_RE = /[﴾﴿][^﴾﴿]*[﴾﴿]/g;
+
+// Splits normal (non-superscript) text into plain runs and Qur'an-styled runs.
+function splitQuranRuns(text: string, base: IRunOptions): TextRun[] {
+  const runs: TextRun[] = [];
+  let last = 0;
+  for (const m of text.matchAll(QURAN_SPAN_RE)) {
+    const i = m.index ?? 0;
+    if (i > last) runs.push(new TextRun({ ...base, text: text.slice(last, i) } as IRunOptions));
+    runs.push(new TextRun({ ...base, text: m[0], style: QURAN_CHAR_STYLE } as IRunOptions));
+    last = i + m[0].length;
+  }
+  if (last < text.length) runs.push(new TextRun({ ...base, text: text.slice(last) } as IRunOptions));
+  return runs;
+}
+
+/** Resolves a page-local footnote number (e.g. ٣) to its document-global
+ *  Word footnote id, when that footnote was converted to a real footnote. */
+export type FootnoteRefResolver = (num: number) => number | undefined;
+
+const REF_NUM_RE = /^\(([0-9]+|[٠-٩]+)\)$/;
+
+function refNumOf(text: string): number | undefined {
+  const m = text.match(REF_NUM_RE);
+  return m ? digitsToInt(m[1]) : undefined;
+}
+
+// Builds the run(s) for a paragraph's text: inline footnote references become
+// real Word footnote references when resolvable (falling back to a raised
+// superscript run), and Qur'anic ﴾…﴿ spans get the QoyyidQuran character
+// style.
+function runsForText(
+  text: string,
+  styleKey: string,
+  resolveRef?: FootnoteRefResolver,
+): Array<TextRun | FootnoteReferenceRun> {
   const base = runOpts(styleKey);
   const segments = splitSuperscriptSegments(text);
-  if (!segments.length) return [new TextRun({ ...base, text } as IRunOptions)];
-  return segments.map(
-    (seg) =>
-      new TextRun({
-        ...base,
-        text: seg.text,
-        superScript: seg.superScript || undefined,
-        size: seg.superScript ? Math.round((base.size as number) * 0.7) : base.size,
-      } as IRunOptions),
-  );
+  if (!segments.length) return splitQuranRuns(text, base);
+  const runs: Array<TextRun | FootnoteReferenceRun> = [];
+  for (const seg of segments) {
+    if (!seg.superScript) {
+      runs.push(...splitQuranRuns(seg.text, base));
+      continue;
+    }
+    const num = refNumOf(seg.text);
+    const footnoteId = num !== undefined && resolveRef ? resolveRef(num) : undefined;
+    if (footnoteId !== undefined) {
+      runs.push(new FootnoteReferenceRun(footnoteId));
+    } else {
+      runs.push(
+        new TextRun({
+          ...base,
+          text: seg.text,
+          superScript: true,
+          size: Math.round((base.size as number) * 0.7),
+        } as IRunOptions),
+      );
+    }
+  }
+  return runs;
 }
 
 function rtlProps(extra?: { spacing?: { before?: number } }): {
@@ -233,7 +308,11 @@ function centeredRtlProps(extra?: { spacing?: { before?: number } }): {
   };
 }
 
-function writeHeading(children: Paragraph[], block: Block): void {
+function writeHeading(
+  children: Array<Paragraph | Table>,
+  block: Block,
+  resolveRef?: FootnoteRefResolver,
+): void {
   const styleKey = styleForBlock(block);
   const texts = splitParagraphs([joinWords(block.lines.map((l) => l.text))]);
   const spec = STYLE_SPEC[styleKey] ?? STYLE_SPEC.heading;
@@ -244,25 +323,80 @@ function writeHeading(children: Paragraph[], block: Block): void {
       new Paragraph({
         heading,
         ...centeredRtlProps({ spacing: spec.spaceBefore ? { before: spec.spaceBefore * 20 } : undefined }),
-        children: runsForText(text, styleKey),
+        // A footnote referenced from a heading is still consumed into a real
+        // Word footnote by collectPageFootnotes, so the heading must emit its
+        // reference run too — otherwise the note has no anchor and vanishes.
+        children: runsForText(text, styleKey, resolveRef),
       }),
     );
   }
 }
 
-function writeTypedBlock(children: Paragraph[], block: Block): void {
+// A markdown table separator row like |---|:---:|.
+const TABLE_SEPARATOR_RE = /^[\s|:\-–—]+$/;
+
+// Renders a `table` block (lines = raw markdown table rows) as a real RTL
+// docx table. Falls back to plain paragraphs when no row parses.
+function writeTableBlock(children: Array<Paragraph | Table>, block: Block): void {
+  const rows: TableRow[] = [];
+  for (const line of block.lines) {
+    const raw = line.text.trim();
+    if (!raw || TABLE_SEPARATOR_RE.test(raw)) continue;
+    const cells = raw.replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+    if (!cells.some(Boolean)) continue;
+    rows.push(
+      new TableRow({
+        children: cells.map(
+          (cell) =>
+            new TableCell({
+              children: [new Paragraph({ ...rtlProps(), children: runsForText(cell, "body") })],
+            }),
+        ),
+      }),
+    );
+  }
+  if (!rows.length) {
+    for (const line of block.lines) {
+      if (!line.text.trim()) continue;
+      children.push(new Paragraph({ style: PARA_STYLE.body, ...rtlProps(), children: runsForText(line.text, "body") }));
+    }
+    return;
+  }
+  children.push(
+    new Table({
+      rows,
+      visuallyRightToLeft: true,
+      width: { size: 100, type: WidthType.PERCENTAGE },
+    }),
+  );
+}
+
+function writeTypedBlock(
+  children: Array<Paragraph | Table>,
+  block: Block,
+  resolveRef?: FootnoteRefResolver,
+): void {
   if (block.type in HEADING_LEVEL) {
-    writeHeading(children, block);
+    writeHeading(children, block, resolveRef);
+    return;
+  }
+  if (block.type === "table") {
+    writeTableBlock(children, block);
     return;
   }
   const styleKey = styleForBlock(block);
   const styleName = PARA_STYLE[styleKey];
+  const leadIn = QA_LEAD_IN[block.type];
   const reflowed = reflowBlock(block);
   const paragraphs = splitParagraphs(reflowed.length ? reflowed : [joinWords(block.lines.map((l) => l.text))]);
   const spec = STYLE_SPEC[styleKey] ?? STYLE_SPEC.body;
   for (let i = 0; i < paragraphs.length; i++) {
     const text = paragraphs[i];
     if (!text.trim()) continue;
+    const runs = runsForText(text, styleKey, resolveRef);
+    if (leadIn && i === 0) {
+      runs.unshift(new TextRun({ ...runOpts(styleKey), text: leadIn, bold: true } as IRunOptions));
+    }
     children.push(
       new Paragraph({
         style: styleName,
@@ -272,7 +406,7 @@ function writeTypedBlock(children: Paragraph[], block: Block): void {
               ? { before: spec.spaceBefore * 20 }
               : undefined,
         }),
-        children: runsForText(text, styleKey),
+        children: runs,
       }),
     );
   }
@@ -313,11 +447,86 @@ function buildCustomStyles(): NonNullable<NonNullable<ConstructorParameters<type
       },
     },
     paragraphStyles,
+    characterStyles: [
+      {
+        id: QURAN_CHAR_STYLE,
+        name: "Qoyyid Quran",
+        run: { bold: true, rightToLeft: true },
+      },
+    ],
   };
 }
 
+// Leading "(N)" entry marker of a footnote block's text.
+const FOOTNOTE_LEAD_RE = /^\(([0-9]+|[٠-٩]+)\)\s*/;
+
+interface PageFootnotes {
+  resolveRef: FootnoteRefResolver;
+  /** Footnote blocks lifted into real Word footnotes — skipped in the body. */
+  consumed: Set<Block>;
+}
+
+/**
+ * Converts a page's referenced footnote blocks into real Word footnotes.
+ * Only entries whose number is actually referenced inline on the same page
+ * are lifted (an unreferenced entry would otherwise vanish — Word renders a
+ * footnote only where a reference run exists); the rest keep the legacy
+ * end-of-page rendering. Word renumbers references sequentially document-wide,
+ * so the original per-page (١)(٢)… markers are dropped from the note text.
+ */
+function collectPageFootnotes(
+  page: Page,
+  footnotes: Record<string, { children: Paragraph[] }>,
+  nextId: () => number,
+): PageFootnotes {
+  // Nothing to lift — skip the whole-page reference scan below when the page
+  // carries no footnote entries at all (the common case for body-only pages).
+  if (!page.blocks.some((b) => b.type === "footnote")) {
+    return { resolveRef: () => undefined, consumed: new Set() };
+  }
+
+  const referenced = new Set<number>();
+  for (const block of page.blocks) {
+    if (block.type === "footnote" || block.type === "table") continue;
+    for (const line of block.lines) {
+      for (const seg of splitSuperscriptSegments(line.text)) {
+        if (!seg.superScript) continue;
+        const num = refNumOf(seg.text);
+        if (num !== undefined) referenced.add(num);
+      }
+    }
+  }
+
+  const idByNum = new Map<number, number>();
+  const consumed = new Set<Block>();
+  for (const block of page.blocks) {
+    if (block.type !== "footnote") continue;
+    const text = block.lines.map((l) => l.text).join(" ").trim();
+    const m = text.match(FOOTNOTE_LEAD_RE);
+    if (!m) continue;
+    const num = digitsToInt(m[1]);
+    if (!referenced.has(num) || idByNum.has(num)) continue;
+    const id = nextId();
+    idByNum.set(num, id);
+    consumed.add(block);
+    footnotes[id] = {
+      children: [
+        new Paragraph({
+          ...rtlProps(),
+          children: runsForText(text.slice(m[0].length), "footnoteText"),
+        }),
+      ],
+    };
+  }
+
+  return { resolveRef: (num) => idByNum.get(num), consumed };
+}
+
 export async function documentToDocxBuffer(doc: Document): Promise<Uint8Array> {
-  const children: Paragraph[] = [];
+  const children: Array<Paragraph | Table> = [];
+  const footnotes: Record<string, { children: Paragraph[] }> = {};
+  let footnoteCounter = 0;
+  const nextFootnoteId = () => ++footnoteCounter;
 
   if (doc.pages?.length) {
     const pages = [...doc.pages].sort((a, b) => a.index - b.index);
@@ -331,7 +540,7 @@ export async function documentToDocxBuffer(doc: Document): Promise<Uint8Array> {
           ...rtlProps(),
           children: [
             new TextRun({
-              text: `— ${page.index + 1} —`,
+              text: `— ${page.label ?? page.index + 1} —`,
               bold: true,
               size: 44,
               color: "666666",
@@ -341,8 +550,10 @@ export async function documentToDocxBuffer(doc: Document): Promise<Uint8Array> {
         }),
       );
       if (hasTypedBlocks(page)) {
+        const pageFootnotes = collectPageFootnotes(page, footnotes, nextFootnoteId);
         for (const block of [...page.blocks].sort((a, b) => (a.reading_order ?? 0) - (b.reading_order ?? 0))) {
-          writeTypedBlock(children, block);
+          if (pageFootnotes.consumed.has(block)) continue;
+          writeTypedBlock(children, block, pageFootnotes.resolveRef);
         }
       } else {
         for (const text of reflowPage(page)) {
@@ -376,6 +587,7 @@ export async function documentToDocxBuffer(doc: Document): Promise<Uint8Array> {
 
   const file = new DocxDocument({
     styles: buildCustomStyles(),
+    footnotes: Object.keys(footnotes).length ? footnotes : undefined,
     sections: [{ children }],
   });
   return new Uint8Array(await Packer.toBuffer(file));

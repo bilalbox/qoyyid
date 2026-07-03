@@ -11,7 +11,10 @@ export type BlockType =
   | "hashiya"
   | "footnote"
   | "heading"
-  | "paragraph";
+  | "paragraph"
+  | "table"
+  | "question"
+  | "answer";
 
 export interface Line {
   text: string;
@@ -32,6 +35,10 @@ export interface Page {
   index: number;
   width?: number;
   height?: number;
+  /** Printed page number from the scan's running header/footer (e.g. "١٦٦"),
+   *  when OCR isolates one — used for the page marker so citations can match
+   *  the physical edition. Falls back to sequential index when absent. */
+  label?: string;
   blocks: Block[];
 }
 

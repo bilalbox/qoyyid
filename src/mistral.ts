@@ -53,6 +53,14 @@ export async function submitBatchOcrJob(env: Env, jobId: string, pdfFileId: stri
     body: {
       model: OCR_MODEL,
       document: { type: "file", file_id: pdfFileId },
+      // Structural metadata (confirmed against a real sync /v1/ocr run,
+      // 2026-07-03, fixtures/mistral/ocr-blocks-page.json): typed blocks with
+      // pixel bboxes, and header/footer text *removed from markdown* into the
+      // page's header/footer fields. mistral-mapping.ts consumes these.
+      include_blocks: true,
+      extract_header: true,
+      extract_footer: true,
+      table_format: "markdown",
     },
   };
   const jsonl = `${JSON.stringify(batchLine)}\n`;
@@ -85,6 +93,10 @@ export async function submitBatchAudioJob(env: Env, jobId: string, fileKey: stri
       model: AUDIO_MODEL,
       file_url: fileUrl,
       diarize: true,
+      // Segment timestamps + speaker ids (confirmed against a real sync run,
+      // 2026-07-03, fixtures/mistral/audio-segments.json). Do not also set
+      // `language` — documented as incompatible with timestamps.
+      timestamp_granularities: ["segment"],
     },
   };
   const jsonl = `${JSON.stringify(batchLine)}\n`;
@@ -120,15 +132,51 @@ export async function pollBatchStatus(env: Env, batchJobId: string): Promise<Mis
 }
 
 /**
- * A page in Mistral OCR 4's response. Confirmed against a real batch result
- * (2026-07-01): there is no `blocks`/bbox array — `header`/`footer` are
- * present in the schema but come back null in practice. All structure has to
- * be parsed out of `markdown` (see mistral-mapping.ts).
+ * A typed content block from Mistral OCR 4 when `include_blocks: true` is
+ * set. Confirmed against a real sync run (2026-07-03,
+ * fixtures/mistral/ocr-blocks-page.json): pixel coordinates in page space,
+ * `content` is the block's markdown text. Documented types: text, title,
+ * list, table, image, equation, caption, code, references, aside_text,
+ * header, footer, signature. Footnote zones come back as `references`.
+ */
+export interface MistralOcrBlock {
+  type: string;
+  top_left_x: number;
+  top_left_y: number;
+  bottom_right_x: number;
+  bottom_right_y: number;
+  content?: string;
+  table_id?: string;
+  image_id?: string;
+}
+
+/**
+ * A page in Mistral OCR 4's response. With `include_blocks`/`extract_header`/
+ * `extract_footer` in the request (confirmed 2026-07-03), `blocks` is
+ * populated and header/footer text is *removed from markdown* into the
+ * `header`/`footer` fields. Older stored responses (pre-2026-07-03 jobs) have
+ * none of these — mistral-mapping.ts falls back to markdown-only parsing.
  */
 export interface MistralOcrPage {
   index: number;
   markdown: string;
   dimensions?: { width: number; height: number; dpi?: number };
+  blocks?: MistralOcrBlock[] | null;
+  header?: string | null;
+  footer?: string | null;
+}
+
+/**
+ * One diarized transcription segment. Confirmed against a real sync run
+ * (2026-07-03, fixtures/mistral/audio-segments.json):
+ * `{ text, start, end, speaker_id: "speaker_1", type: "transcription_segment" }`.
+ */
+export interface MistralAudioSegment {
+  text: string;
+  start: number;
+  end: number;
+  speaker_id?: string | null;
+  type?: string;
 }
 
 export interface MistralBatchResultLine {
@@ -137,10 +185,9 @@ export interface MistralBatchResultLine {
     body?: {
       pages?: MistralOcrPage[];
       text?: string;
-      // Per Mistral's documented /v1/audio/transcriptions response schema
-      // (https://docs.mistral.ai/api/endpoint/audio/transcriptions) — not yet
-      // confirmed against a real completed batch job the way the OCR fields
-      // above are. Verify this shape survives once a real audio batch finishes.
+      segments?: MistralAudioSegment[] | null;
+      // Confirmed against a real sync /v1/audio/transcriptions run
+      // (2026-07-03): usage.prompt_audio_seconds is present as documented.
       usage?: { prompt_audio_seconds?: number };
     };
   };

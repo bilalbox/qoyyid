@@ -1,25 +1,30 @@
 import type { Block, BlockType, Page } from "./types";
-import type { MistralOcrPage } from "./mistral";
+import type { MistralAudioSegment, MistralOcrBlock, MistralOcrPage } from "./mistral";
 
 /**
  * Maps Mistral OCR 4 page output into qoyyid's Document/Page/Block schema
  * (src/types.ts).
  *
- * Confirmed against a real batch result (2026-07-01): Mistral OCR 4 does NOT
- * return a `blocks`/bbox array — a page is just `{ index, markdown,
- * dimensions, images, tables, hyperlinks, header, footer }`, with header/
- * footer unpopulated in practice. So structure has to come from parsing the
- * markdown text itself (blank-line paragraphs, `#`/`##` headings, `(N)`
- * footnote paragraphs) rather than page-geometry heuristics.
+ * Two OCR paths:
+ *  - Block path (jobs submitted with `include_blocks`/`extract_header`/
+ *    `extract_footer`, 2026-07-03+): typed blocks with pixel bboxes drive
+ *    classification — `references` → footnote, `aside_text` → hashiya,
+ *    `title` → heading, header/footer dropped (their text is already removed
+ *    from markdown by the API). matn vs sharh is resolved document-wide from
+ *    text density (chars per bbox area — larger print = lower density) in
+ *    classifyMatnSharh, restoring what the prior Surya pipeline did with
+ *    per-line geometry.
+ *  - Legacy markdown path: older stored mistral_response.json lines have no
+ *    blocks (confirmed 2026-07-01), so structure comes from parsing markdown
+ *    (blank-line paragraphs, `#` headings, `(N)` footnote paragraphs) and the
+ *    running-header heuristics below. Kept so admin "reproduce" on old jobs
+ *    still works; note the docx output for old jobs is intentionally NOT
+ *    byte-stable — reproduce picks up rendering upgrades (e.g. real Word
+ *    footnotes) as they land.
  *
- * The matn/sharh/hashiya (main text/commentary/marginalia) block types and
- * the lexical heading-promotion keyword lists below (KEYWORDS,
- * LEMMA_PREFIXES, symbolHit/lemmaHit) are ported from a prior Python-based
- * Surya-OCR pipeline for the same classical Arabic manuscript OCR use case,
- * which had per-line bounding boxes and used geometry (bbox position/width)
- * to classify these zones. This API gives no bbox, so that geometry-based
- * classification is gone — only the text-only lexical-heading heuristic
- * survived the port, since it never depended on bbox.
+ * The lexical heading-promotion keyword lists (KEYWORDS, LEMMA_PREFIXES,
+ * symbolHit/lemmaHit) are ported from the prior Python/Surya pipeline and
+ * apply to both paths.
  */
 
 const HEADING_TYPES = new Set<string>(["title", "h1", "h2", "h3", "heading"]);
@@ -85,7 +90,8 @@ const HEADING_RE = /^(#{1,6})\s+(.*)$/;
 // A footnote entry: starts with a parenthesized number, Latin or Arabic-Indic
 // digits (e.g. "(1)" or "(١)") — Mistral gives no other structural signal
 // separating footnotes from body text (no rule/divider survives into markdown).
-const FOOTNOTE_RE = /^\(([0-9]+|[٠-٩]+)\)/;
+// Exported so docx-export matches footnote entries with the same grammar.
+export const FOOTNOTE_RE = /^\(([0-9]+|[٠-٩]+)\)/;
 // An inline footnote reference the way Mistral renders it mid-sentence,
 // e.g. "...word$^{(٣)}$ more text" — LaTeX superscript wrapping a plain
 // parenthesized number. There's no real math here, so we drop the literal
@@ -157,6 +163,11 @@ function isHeaderCandidateText(text: string): boolean {
 export interface MappedPage {
   page: Page;
   headerCandidates: HeaderCandidate[];
+  /** Text density (chars per bbox area) of each body-typed block — input to
+   *  the document-wide matn/sharh split in classifyMatnSharh. Holds the Block
+   *  reference directly so later passes that filter or retype blocks can't
+   *  detach a density from its block. Only populated by the block path. */
+  bodyDensities?: Array<{ block: Block; density: number }>;
 }
 
 function buildBlocks(raw: string[]): Block[] {
@@ -165,6 +176,15 @@ function buildBlocks(raw: string[]): Block[] {
   for (const text of raw) {
     const classified = classifyMarkdownParagraph(text);
     if (!classified) continue;
+    if (classified.type === "footnote") {
+      // A footnote paragraph can hold several concatenated "(N) …" entries
+      // (Mistral concatenates them without newlines) — one block per entry so
+      // docx-export can pair each with its own inline reference.
+      for (const entry of splitFootnoteEntries(classified.text)) {
+        blocks.push({ type: "footnote", reading_order: order++, bbox: null, lines: [{ text: entry }] });
+      }
+      continue;
+    }
     blocks.push({
       type: classified.type,
       reading_order: order++,
@@ -199,6 +219,8 @@ function findHeaderCandidates(raw: string[], pageIndex: number): HeaderCandidate
 }
 
 export function mapMistralPageToQoyyidPage(mistralPage: MistralOcrPage): MappedPage {
+  if (mistralPage.blocks?.length) return mapFromOcrBlocks(mistralPage);
+
   const pageW = mistralPage.dimensions?.width ?? 0;
   const pageH = mistralPage.dimensions?.height ?? 0;
   const raw = splitMarkdownParagraphs(mistralPage.markdown ?? "");
@@ -209,6 +231,260 @@ export function mapMistralPageToQoyyidPage(mistralPage: MistralOcrPage): MappedP
   const page: Page = { index: mistralPage.index, width: pageW, height: pageH, blocks };
   promoteLexicalHeadings(page.blocks);
   return { page, headerCandidates };
+}
+
+// --- block path (include_blocks responses, 2026-07-03+) --
+
+// A printed folio number in a running header/footer: digits only, possibly
+// decorated with dashes/brackets/dots, e.g. "١٦٦" or "- 12 -" (decoration
+// class kept a superset of PAGE_NUMBER_ONLY_RE's so the two page-number
+// notions can't disagree on the same string).
+const PAGE_LABEL_RE = /^[\s\-–—.[\]()]*([0-9٠-٩]+)[\s\-–—.[\]()]*$/;
+
+const ARABIC_INDIC_ZERO = "٠".charCodeAt(0);
+
+export function digitsToInt(s: string): number {
+  let out = 0;
+  for (const ch of s) {
+    const code = ch.charCodeAt(0);
+    const d = code >= ARABIC_INDIC_ZERO ? code - ARABIC_INDIC_ZERO : code - 48;
+    out = out * 10 + d;
+  }
+  return out;
+}
+
+// Heading level for a `title` block, from the classical division hierarchy:
+// كتاب (book) above باب (chapter) above فصل/مسألة/مبحث… (section).
+const H1_WORDS = new Set(["كتاب", "القسم"]);
+const H2_WORDS = new Set(["باب", "مقدمة", "خاتمة", "مجلس"]);
+
+function headingLevelFor(text: string): number {
+  const first = stripDiacritics(text.trim().split(/\s+/)[0] ?? "").replace(/^[«»().،:]+|[«»().،:]+$/g, "");
+  if (H1_WORDS.has(first)) return 1;
+  if (H2_WORDS.has(first)) return 2;
+  if (KEYWORDS.has(first)) return 3;
+  return 2;
+}
+
+function bboxOf(b: MistralOcrBlock): number[] {
+  return [b.top_left_x, b.top_left_y, b.bottom_right_x, b.bottom_right_y];
+}
+
+// A bare inline "(N)" footnote reference (the block path's markdown uses
+// plain parens, not the $^{(N)}$ LaTeX shape), not already wrapped in PUA
+// sentinels by markInlineFootnoteMarkup.
+const PLAIN_REF_RE = new RegExp(
+  `(?<!${SUPERSCRIPT_MARK_OPEN})\\(([0-9]{1,3}|[٠-٩]{1,3})\\)(?!${SUPERSCRIPT_MARK_CLOSE})`,
+  "g",
+);
+
+// Marks bare inline "(N)" footnote references — but only numbers that
+// actually have a matching footnote entry on the same page, so citation
+// parens like "(ص ٢٢٢)" or "(١/ ١٤٤)" stay untouched.
+function markPlainInlineFootnoteRefs(text: string, footnoteNums: Set<number>): string {
+  if (!footnoteNums.size) return text;
+  return text.replace(PLAIN_REF_RE, (whole, num: string) =>
+    footnoteNums.has(digitsToInt(num)) ? `${SUPERSCRIPT_MARK_OPEN}${whole}${SUPERSCRIPT_MARK_CLOSE}` : whole,
+  );
+}
+
+// A footnote entry boundary *inside* running text: "(N)" after entry-ending
+// punctuation (period/question/quote/bracket, or a closing citation paren —
+// muhaqqiq entries often end "…(٢/ ٣٤١)" with no period). Confirmed against a
+// real references block (2026-07-03): Mistral can concatenate consecutive
+// entries into one content string with no newline.
+const INLINE_ENTRY_BOUNDARY_RE = /(?<=[.!؟»،؛)\]])\s+(?=\((?:[0-9]{1,3}|[٠-٩]{1,3})\)\s)/g;
+
+// Splits a references block into individual footnote entries. A new entry
+// starts at a line leading with "(N)", or mid-line after sentence-ending
+// punctuation — but mid-line only when N is exactly the previous entry's
+// number + 1, so quoted parenthesized numbers can't fragment an entry.
+function splitFootnoteEntries(content: string): string[] {
+  const lineEntries: string[] = [];
+  for (const line of content.split("\n")) {
+    const text = line.trim();
+    if (!text) continue;
+    if (FOOTNOTE_RE.test(text) || !lineEntries.length) {
+      lineEntries.push(text);
+    } else {
+      lineEntries[lineEntries.length - 1] += ` ${text}`;
+    }
+  }
+
+  const entries: string[] = [];
+  for (const entry of lineEntries) {
+    let lastNum = digitsToInt(entry.match(FOOTNOTE_RE)?.[1] ?? "0");
+    let current = "";
+    for (const piece of entry.split(INLINE_ENTRY_BOUNDARY_RE)) {
+      const m = piece.match(FOOTNOTE_RE);
+      if (current && m && digitsToInt(m[1]) === lastNum + 1) {
+        entries.push(current.trim());
+        current = piece;
+        lastNum += 1;
+      } else {
+        current = current ? `${current} ${piece}` : piece;
+      }
+    }
+    if (current.trim()) entries.push(current.trim());
+  }
+  return entries.map((e) => markInlineFootnoteMarkup(e));
+}
+
+function mapFromOcrBlocks(mistralPage: MistralOcrPage): MappedPage {
+  const pageW = mistralPage.dimensions?.width ?? 0;
+  const pageH = mistralPage.dimensions?.height ?? 0;
+
+  // Header takes precedence: when both carry digits, the footer is more
+  // often a quire/juz mark while the folio number runs in the header.
+  let label: string | undefined;
+  for (const furniture of [mistralPage.header, mistralPage.footer]) {
+    const m = furniture?.match(PAGE_LABEL_RE);
+    if (m) {
+      label = m[1];
+      break;
+    }
+  }
+
+  const blocks: Block[] = [];
+  const bodyDensities: Array<{ block: Block; density: number }> = [];
+  let order = 0;
+
+  for (const src of mistralPage.blocks ?? []) {
+    const content = (src.content ?? "").trim();
+    if (!content) continue;
+    const bbox = bboxOf(src);
+
+    switch (src.type) {
+      case "header":
+      case "footer":
+        // Already isolated out of markdown by extract_header/extract_footer;
+        // page number captured via the header/footer fields above.
+        break;
+      case "image":
+      case "signature":
+        break;
+      case "table":
+        blocks.push({
+          type: "table",
+          reading_order: order++,
+          bbox,
+          lines: content.split("\n").map((text) => ({ text: text.trim() })).filter((l) => l.text),
+        });
+        break;
+      case "references":
+        // Footnote zone; may hold several "(N) …" entries — one Block each so
+        // docx-export can match them to their inline references individually.
+        for (const entry of splitFootnoteEntries(content)) {
+          blocks.push({ type: "footnote", reading_order: order++, bbox, lines: [{ text: entry }] });
+        }
+        break;
+      case "aside_text":
+        for (const para of splitMarkdownParagraphs(content)) {
+          blocks.push({ type: "hashiya", reading_order: order++, bbox, lines: [{ text: para }] });
+        }
+        break;
+      case "title": {
+        const text = content.replace(HEADING_RE, "$2").trim();
+        const level = headingLevelFor(text);
+        blocks.push({ type: `h${level}` as BlockType, reading_order: order++, bbox, level, lines: [{ text }] });
+        break;
+      }
+      default: {
+        // text / list / caption / code / equation / unknown → paragraphs.
+        const area = Math.max(1, (bbox[2] - bbox[0]) * (bbox[3] - bbox[1]));
+        const density = content.replace(/\s+/g, "").length / area;
+        for (const para of splitMarkdownParagraphs(content)) {
+          const classified = classifyMarkdownParagraph(para);
+          if (!classified) continue;
+          // On the block path Mistral already isolates footnotes into
+          // `references` blocks, so a "(N) …"-leading paragraph inside a
+          // text block is body content (an enumerated item, a quoted entry) —
+          // never let the legacy footnote check lift it out of the flow.
+          const type = classified.type === "footnote" ? "body" : classified.type;
+          const block: Block = {
+            type,
+            reading_order: order++,
+            bbox,
+            level: classified.level,
+            lines: [{ text: classified.text }],
+          };
+          if (type === "body") bodyDensities.push({ block, density });
+          blocks.push(block);
+        }
+      }
+    }
+  }
+
+  // Link bare inline "(N)" references to this page's footnote entries.
+  const footnoteNums = new Set<number>();
+  for (const b of blocks) {
+    if (b.type !== "footnote") continue;
+    const m = b.lines[0]?.text.match(FOOTNOTE_RE);
+    if (m) footnoteNums.add(digitsToInt(m[1]));
+  }
+  for (const b of blocks) {
+    if (b.type === "footnote" || b.type === "table") continue;
+    for (const line of b.lines) {
+      line.text = markPlainInlineFootnoteRefs(line.text, footnoteNums);
+    }
+  }
+
+  const page: Page = { index: mistralPage.index, width: pageW, height: pageH, label, blocks };
+  promoteLexicalHeadings(page.blocks);
+  return { page, headerCandidates: [], bodyDensities };
+}
+
+/**
+ * Document-wide matn/sharh split (call once all pages are mapped, block path
+ * only). In printed sharh editions the matn is set in visibly larger type
+ * than the commentary, so its text density (chars per bbox area) is markedly
+ * lower. A 2-means split over log-densities of all body blocks decides
+ * whether the document has two registers at all: only when the dense cluster
+ * is ≥ MIN_SEPARATION× denser and both clusters are non-trivially populated
+ * do body blocks get relabeled matn (sparse) / sharh (dense) — a single-
+ * register book stays "body" untouched.
+ */
+export function classifyMatnSharh(mapped: MappedPage[]): void {
+  const MIN_SEPARATION = 1.6;
+  const MIN_CLUSTER_SHARE = 0.05;
+
+  const samples: Array<{ block: Block; logDensity: number }> = [];
+  for (const m of mapped) {
+    for (const { block, density } of m.bodyDensities ?? []) {
+      // Blocks retyped since sampling (e.g. promoted to headings by
+      // promoteLexicalHeadings) would skew the clusters with their large-type
+      // densities — only still-body blocks participate.
+      if (block.type === "body" && density > 0) {
+        samples.push({ block, logDensity: Math.log(density) });
+      }
+    }
+  }
+  if (samples.length < 4) return;
+
+  const values = samples.map((s) => s.logDensity).sort((a, b) => a - b);
+  let lo = values[0];
+  let hi = values[values.length - 1];
+  if (hi - lo < 1e-9) return;
+  for (let iter = 0; iter < 20; iter++) {
+    const mid = (lo + hi) / 2;
+    const low = values.filter((v) => v <= mid);
+    const high = values.filter((v) => v > mid);
+    if (!low.length || !high.length) break;
+    const nextLo = low.reduce((a, b) => a + b, 0) / low.length;
+    const nextHi = high.reduce((a, b) => a + b, 0) / high.length;
+    if (Math.abs(nextLo - lo) < 1e-6 && Math.abs(nextHi - hi) < 1e-6) break;
+    lo = nextLo;
+    hi = nextHi;
+  }
+
+  if (Math.exp(hi - lo) < MIN_SEPARATION) return;
+  const threshold = (lo + hi) / 2;
+  const sparseShare = values.filter((v) => v <= threshold).length / values.length;
+  if (sparseShare < MIN_CLUSTER_SHARE || sparseShare > 1 - MIN_CLUSTER_SHARE) return;
+
+  for (const s of samples) {
+    s.block.type = s.logDensity <= threshold ? "matn" : "sharh";
+  }
 }
 
 function normalizeForMatch(text: string): string {
@@ -252,11 +528,145 @@ export function stripRunningHeaders(mapped: MappedPage[]): void {
   }
 }
 
-export function mapMistralAudioToQoyyidPage(text: string): MappedPage {
-  const raw = splitMarkdownParagraphs(text);
-  const blocks = buildBlocks(raw);
+// --- audio (Voxtral) --
+
+/** One speaker turn: consecutive same-speaker segments with < TURN_GAP_SECONDS
+ *  of silence between them, joined into a paragraph. */
+interface AudioTurn {
+  speaker: string;
+  text: string;
+  start: number;
+  end: number;
+}
+
+const TURN_GAP_SECONDS = 2.0;
+
+function buildTurns(segments: MistralAudioSegment[]): AudioTurn[] {
+  const turns: AudioTurn[] = [];
+  for (const seg of segments) {
+    const text = seg.text.trim();
+    if (!text) continue;
+    const speaker = seg.speaker_id ?? "speaker_1";
+    const prev = turns[turns.length - 1];
+    if (prev && prev.speaker === speaker && seg.start - prev.end < TURN_GAP_SECONDS) {
+      prev.text = `${prev.text} ${text}`;
+      prev.end = seg.end;
+    } else {
+      turns.push({ speaker, text, start: seg.start, end: seg.end });
+    }
+  }
+  return turns;
+}
+
+// A turn where the qari' (reader) picks up the matn — the fixed formula that
+// opens a reading in a dars: «قال المؤلف/المصنف/الإمام… رحمه الله». Not
+// anchored: the qari' commonly opens with a basmala or greeting before the
+// formula, so it's searched within the start of the turn instead.
+const QARI_CUE_RE = /و?ف?قال\s+(المؤلف|المصنف|الإمام|الناظم|الشيخ|صاحب|رحمه)/;
+const QARI_CUE_WINDOW_CHARS = 200;
+
+// The canonical frame of a recorded dars: opening praise formulas, the
+// «أما بعد» pivot into the lesson body, then a question session.
+const INTRO_OPEN_RE = /^(بسم الله|الحمد لله|إن الحمد لله|السلام عليكم)/;
+const AMMA_BAD_RE = /أما بعد/;
+
+function speakerRoles(turns: AudioTurn[]): Map<string, "shaykh" | "qari" | "other"> {
+  const durations = new Map<string, number>();
+  for (const t of turns) {
+    durations.set(t.speaker, (durations.get(t.speaker) ?? 0) + (t.end - t.start));
+  }
+  const shaykh = [...durations.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+
+  const roles = new Map<string, "shaykh" | "qari" | "other">();
+  for (const speaker of durations.keys()) {
+    roles.set(speaker, speaker === shaykh ? "shaykh" : "other");
+  }
+  for (const t of turns) {
+    if (
+      roles.get(t.speaker) === "other" &&
+      QARI_CUE_RE.test(stripDiacritics(t.text.slice(0, QARI_CUE_WINDOW_CHARS)))
+    ) {
+      roles.set(t.speaker, "qari");
+    }
+  }
+  return roles;
+}
+
+function headingBlock(text: string, order: number): Block {
+  return { type: "h2", reading_order: order, bbox: null, level: 2, lines: [{ text }] };
+}
+
+/**
+ * Maps a Voxtral transcription into a single qoyyid page.
+ *
+ * With diarized segments (jobs submitted with timestamp_granularities,
+ * 2026-07-03+), turns become paragraphs and the standard dars format drives
+ * structure: dominant-duration speaker is the shaykh (commentary → sharh), a
+ * secondary speaker opening with «قال المؤلف…» is the qari' reading the matn
+ * (→ matn), remaining speakers are questioners (→ question, with the
+ * shaykh's following turn → answer). Section headings (المقدمة / الدرس /
+ * الأسئلة) are inserted where the canonical frame is detected. Roles apply
+ * only when 2+ speakers were diarized — a single-mic recording stays plain
+ * body text.
+ *
+ * Without segments (older stored responses), falls back to markdown
+ * paragraph splitting of the flat transcript.
+ */
+export function mapMistralAudioToQoyyidPage(body: {
+  text?: string;
+  segments?: MistralAudioSegment[] | null;
+}): MappedPage {
+  const segments = body.segments ?? [];
+  if (segments.length < 2) {
+    // A single diarized segment still carries the whole transcript — never
+    // drop it just because the flat `text` field is empty or missing.
+    const text = body.text?.trim() ? body.text : segments.map((s) => s.text).join("\n\n");
+    const raw = splitMarkdownParagraphs(text);
+    const blocks = buildBlocks(raw);
+    const page: Page = { index: 0, width: 0, height: 0, blocks };
+    promoteLexicalHeadings(page.blocks);
+    return { page, headerCandidates: [] };
+  }
+
+  const turns = buildTurns(segments);
+  const roles = speakerRoles(turns);
+  const multiSpeaker = roles.size >= 2;
+
+  const types: BlockType[] = turns.map((turn, i) => {
+    if (!multiSpeaker) return "body";
+    const role = roles.get(turn.speaker);
+    if (role === "qari") return "matn";
+    if (role === "other") return "question";
+    const prev = turns[i - 1];
+    if (prev && roles.get(prev.speaker) === "other") return "answer";
+    return "sharh";
+  });
+
+  // Canonical dars frame → section headings, inserted at turn boundaries.
+  const strippedFirst = stripDiacritics(turns[0]?.text ?? "");
+  const ammaIdx = turns.findIndex((t, i) => i < 6 && AMMA_BAD_RE.test(stripDiacritics(t.text)));
+  const hasIntro = INTRO_OPEN_RE.test(strippedFirst) && ammaIdx >= 0 && ammaIdx + 1 < turns.length;
+  const firstQuestionIdx = types.indexOf("question");
+  const questionsStartIdx = firstQuestionIdx > turns.length / 2 ? firstQuestionIdx : -1;
+
+  const blocks: Block[] = [];
+  let order = 0;
+  for (let i = 0; i < turns.length; i++) {
+    if (hasIntro && i === 0) blocks.push(headingBlock("المقدمة", order++));
+    if (hasIntro && i === ammaIdx + 1) blocks.push(headingBlock("الدرس", order++));
+    if (i === questionsStartIdx) blocks.push(headingBlock("الأسئلة", order++));
+    blocks.push({
+      type: types[i],
+      reading_order: order++,
+      bbox: null,
+      lines: [{ text: turns[i].text }],
+    });
+  }
 
   const page: Page = { index: 0, width: 0, height: 0, blocks };
-  promoteLexicalHeadings(page.blocks);
+  // Single-speaker recordings have no role structure, but spoken section
+  // announcements (باب/فصل…) should still become headings, as the flat-text
+  // path always did.
+  if (!multiSpeaker) promoteLexicalHeadings(page.blocks);
   return { page, headerCandidates: [] };
 }

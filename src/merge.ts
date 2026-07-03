@@ -4,7 +4,7 @@ import { putBytes, putJson } from "./r2";
 import { normalizeDocument } from "./normalize";
 import { documentToDocxBuffer } from "./docx-export";
 import { fetchBatchResult, type MistralBatchJobStatus, type MistralBatchResultLine } from "./mistral";
-import { mapMistralPageToQoyyidPage, mapMistralAudioToQoyyidPage, stripRunningHeaders } from "./mistral-mapping";
+import { classifyMatnSharh, mapMistralPageToQoyyidPage, mapMistralAudioToQoyyidPage, stripRunningHeaders } from "./mistral-mapping";
 import { notifyUser } from "./fcm";
 
 interface JobForMerge {
@@ -39,11 +39,11 @@ export async function buildDocumentAndDocx(
   let unitsProcessed = 0;
 
   if (job.modality === "audio") {
-    const text = resultLine.response?.body?.text;
-    if (!text) {
+    const body = resultLine.response?.body;
+    if (!body?.text && !body?.segments?.length) {
       throw new Error(`no audio transcript for job ${jobId} in batch output`);
     }
-    const mapped = mapMistralAudioToQoyyidPage(text);
+    const mapped = mapMistralAudioToQoyyidPage(body);
     pages = [mapped.page];
     // asr_minutes usage is billed on wall-clock audio duration, from Mistral's
     // own usage.prompt_audio_seconds — never trust client-supplied duration.
@@ -58,6 +58,7 @@ export async function buildDocumentAndDocx(
 
     const mapped = mistralPages.map(mapMistralPageToQoyyidPage);
     stripRunningHeaders(mapped);
+    classifyMatnSharh(mapped);
     pages = mapped.map((m) => m.page);
     unitsProcessed = pages.length;
   }
