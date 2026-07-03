@@ -114,6 +114,18 @@ function markInlineFootnoteMarkup(text: string): string {
 // page-boundary marker, so these would just duplicate it as noise).
 const PAGE_NUMBER_ONLY_RE = /^[\s0-9٠-٩\-–—.]+$/;
 
+// A markdown image placeholder like ![img-2.jpeg](img-2.jpeg). Mistral OCR
+// emits these for regions it renders as images — decorative headings/marginalia
+// it can't read as glyphs, or actual figures — but we neither embed nor keep the
+// image (include_image_base64 is off), so the placeholder is pure noise in every
+// downstream consumer (docx, search, flat text). Stripped at ingestion so it
+// never reaches the stored blocks.
+const IMAGE_MARKDOWN_RE = /!\[[^\]]*\]\([^)]*\)/g;
+
+function stripImageMarkdown(text: string): string {
+  return text.replace(IMAGE_MARKDOWN_RE, "");
+}
+
 function splitMarkdownParagraphs(markdown: string): string[] {
   return markdown
     .split(/\n\s*\n+/)
@@ -223,7 +235,7 @@ export function mapMistralPageToQoyyidPage(mistralPage: MistralOcrPage): MappedP
 
   const pageW = mistralPage.dimensions?.width ?? 0;
   const pageH = mistralPage.dimensions?.height ?? 0;
-  const raw = splitMarkdownParagraphs(mistralPage.markdown ?? "");
+  const raw = splitMarkdownParagraphs(stripImageMarkdown(mistralPage.markdown ?? ""));
 
   const blocks = buildBlocks(raw);
   const headerCandidates = findHeaderCandidates(raw, mistralPage.index);
@@ -350,7 +362,10 @@ function mapFromOcrBlocks(mistralPage: MistralOcrPage): MappedPage {
   let order = 0;
 
   for (const src of mistralPage.blocks ?? []) {
-    const content = (src.content ?? "").trim();
+    // Strip image placeholders before the empty check: an `image`-type block, or
+    // a text/title block whose content was only a placeholder, then drops out
+    // here instead of becoming a stray empty (or noise) block.
+    const content = stripImageMarkdown(src.content ?? "").trim();
     if (!content) continue;
     const bbox = bboxOf(src);
 
