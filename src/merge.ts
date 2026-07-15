@@ -3,7 +3,7 @@ import { jobKeys } from "./http";
 import { putBytes, putJson } from "./r2";
 import { normalizeDocument } from "./normalize";
 import { documentToDocxBuffer } from "./docx-export";
-import { fetchBatchResult, type MistralBatchJobStatus, type MistralBatchResultLine } from "./mistral";
+import { fetchBatchErrors, fetchBatchResult, type MistralBatchJobStatus, type MistralBatchResultLine } from "./mistral";
 import { classifyMatnSharh, mapMistralPageToQoyyidPage, mapMistralAudioToQoyyidPage, stripRunningHeaders } from "./mistral-mapping";
 import { notifyUser } from "./fcm";
 
@@ -80,6 +80,34 @@ export async function buildDocumentAndDocx(
 }
 
 /**
+ * A batch job can report status SUCCESS while still having no output_file —
+ * Mistral routes a per-request failure (e.g. an upstream timeout) to
+ * error_file instead. Builds the most specific message it can: the actual
+ * per-request error if error_file has a line for this job, else the batch's
+ * own error summary, else the bare fallback. Never throws itself — this runs
+ * inside finalizeJob's catch-all, and a failure here shouldn't clobber the
+ * real error with a secondary one.
+ */
+async function describeMissingOutput(env: Env, jobId: string, batchStatus: MistralBatchJobStatus): Promise<string> {
+  const fallback = `batch job ${batchStatus.id} has no output_file`;
+  if (batchStatus.error_file) {
+    try {
+      const errors = await fetchBatchErrors(env, batchStatus.error_file);
+      const line = errors.find((e) => e.custom_id === jobId);
+      if (line) {
+        const status = line.response?.status_code;
+        const body = line.response?.body ?? JSON.stringify(line.error);
+        return `Mistral batch job ${batchStatus.id} failed for this job: HTTP ${status}: ${body}`;
+      }
+    } catch {
+      // fall through to the summary/fallback below
+    }
+  }
+  const summary = batchStatus.errors?.map((e) => `${e.message} (x${e.count})`).join("; ");
+  return summary ? `${fallback}: ${summary}` : fallback;
+}
+
+/**
  * Fetches the completed Mistral batch result, maps it to qoyyid's Document
  * schema, builds the .docx, stores both in R2, and logs quota usage from
  * Mistral's own reported page count (never from client input — see plan §5
@@ -109,7 +137,7 @@ export async function finalizeJob(env: Env, jobId: string, batchStatus: MistralB
   // job stuck in 'merging' with no path back to a pollable/terminal status.
   try {
     if (!batchStatus.output_file) {
-      throw new Error(`batch job ${batchStatus.id} has no output_file`);
+      throw new Error(await describeMissingOutput(env, jobId, batchStatus));
     }
     const results = await fetchBatchResult(env, batchStatus.output_file);
     const resultLine = results.find((r) => r.custom_id === jobId);

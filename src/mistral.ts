@@ -125,6 +125,9 @@ export interface MistralBatchJobStatus {
   status: "QUEUED" | "RUNNING" | "SUCCESS" | "FAILED" | "CANCELLED" | string;
   output_file?: string | null;
   error_file?: string | null;
+  // Batch-level error summary (e.g. `[{ message: "HTTP Error, status code: 504", count: 1 }]`)
+  // — present even when `errors` in a per-request line would need `error_file` to see.
+  errors?: { message: string; count: number }[] | null;
 }
 
 export async function pollBatchStatus(env: Env, batchJobId: string): Promise<MistralBatchJobStatus> {
@@ -210,4 +213,33 @@ export async function fetchBatchResult(env: Env, outputFileId: string): Promise<
     .split("\n")
     .filter((line) => line.trim())
     .map((line) => JSON.parse(line) as MistralBatchResultLine);
+}
+
+/**
+ * One line of a batch job's error_file — the per-request failure Mistral
+ * routes here instead of output_file. Confirmed against a real failed batch
+ * request (2026-07-14): `{ id, custom_id, response: { status_code, body },
+ * error }`.
+ */
+export interface MistralBatchErrorLine {
+  id: string;
+  custom_id: string;
+  response?: { status_code?: number; body?: string } | null;
+  error?: unknown;
+}
+
+/** Downloads and parses a batch job's error_file JSONL (see fetchBatchResult). */
+export async function fetchBatchErrors(env: Env, errorFileId: string): Promise<MistralBatchErrorLine[]> {
+  const res = await fetch(`${MISTRAL_API}/files/${errorFileId}/content`, {
+    headers: authHeaders(env),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`Mistral API GET /files/${errorFileId}/content: HTTP ${res.status}: ${detail}`);
+  }
+  const text = await res.text();
+  return text
+    .split("\n")
+    .filter((line) => line.trim())
+    .map((line) => JSON.parse(line) as MistralBatchErrorLine);
 }
