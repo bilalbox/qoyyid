@@ -61,6 +61,7 @@ export async function submitBatchOcrJob(env: Env, jobId: string, pdfFileId: stri
       extract_header: true,
       extract_footer: true,
       table_format: "markdown",
+      confidence_scores_granularity: "block",
     },
   };
   const jsonl = `${JSON.stringify(batchLine)}\n`;
@@ -135,12 +136,15 @@ export async function pollBatchStatus(env: Env, batchJobId: string): Promise<Mis
 }
 
 /**
- * A typed content block from Mistral OCR 4 when `include_blocks: true` is
- * set. Confirmed against a real sync run (2026-07-03,
+ * A typed content block from Mistral OCR 4 / 4.1 when `include_blocks: true`
+ * is set. Confirmed against a real sync run (2026-07-03,
  * fixtures/mistral/ocr-blocks-page.json): pixel coordinates in page space,
  * `content` is the block's markdown text. Documented types: text, title,
  * list, table, image, equation, caption, code, references, aside_text,
  * header, footer, signature. Footnote zones come back as `references`.
+ *
+ * In OCR 4.1 (`confidence_scores_granularity: "block"`), confidence scores
+ * are included per block.
  */
 export interface MistralOcrBlock {
   type: string;
@@ -151,10 +155,12 @@ export interface MistralOcrBlock {
   content?: string;
   table_id?: string;
   image_id?: string;
+  confidence?: number;
+  average_content_confidence_score?: number;
 }
 
 /**
- * A page in Mistral OCR 4's response. With `include_blocks`/`extract_header`/
+ * A page in Mistral OCR's response. With `include_blocks`/`extract_header`/
  * `extract_footer` in the request (confirmed 2026-07-03), `blocks` is
  * populated and header/footer text is *removed from markdown* into the
  * `header`/`footer` fields. Older stored responses (pre-2026-07-03 jobs) have

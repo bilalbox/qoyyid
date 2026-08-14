@@ -368,6 +368,15 @@ function mapFromOcrBlocks(mistralPage: MistralOcrPage): MappedPage {
     const content = stripImageMarkdown(src.content ?? "").trim();
     if (!content) continue;
     const bbox = bboxOf(src);
+    const confidence = src.confidence ?? src.average_content_confidence_score;
+    const makeBlock = (type: BlockType, textLines: string[], level?: number | null): Block => ({
+      type,
+      reading_order: order++,
+      bbox,
+      confidence,
+      level,
+      lines: textLines.map((text) => ({ text, confidence })),
+    });
 
     switch (src.type) {
       case "header":
@@ -379,29 +388,29 @@ function mapFromOcrBlocks(mistralPage: MistralOcrPage): MappedPage {
       case "signature":
         break;
       case "table":
-        blocks.push({
-          type: "table",
-          reading_order: order++,
-          bbox,
-          lines: content.split("\n").map((text) => ({ text: text.trim() })).filter((l) => l.text),
-        });
+        blocks.push(
+          makeBlock(
+            "table",
+            content.split("\n").map((text) => text.trim()).filter(Boolean),
+          ),
+        );
         break;
       case "references":
         // Footnote zone; may hold several "(N) …" entries — one Block each so
         // docx-export can match them to their inline references individually.
         for (const entry of splitFootnoteEntries(content)) {
-          blocks.push({ type: "footnote", reading_order: order++, bbox, lines: [{ text: entry }] });
+          blocks.push(makeBlock("footnote", [entry]));
         }
         break;
       case "aside_text":
         for (const para of splitMarkdownParagraphs(content)) {
-          blocks.push({ type: "hashiya", reading_order: order++, bbox, lines: [{ text: para }] });
+          blocks.push(makeBlock("hashiya", [para]));
         }
         break;
       case "title": {
         const text = content.replace(HEADING_RE, "$2").trim();
         const level = headingLevelFor(text);
-        blocks.push({ type: `h${level}` as BlockType, reading_order: order++, bbox, level, lines: [{ text }] });
+        blocks.push(makeBlock(`h${level}` as BlockType, [text], level));
         break;
       }
       default: {
@@ -416,13 +425,7 @@ function mapFromOcrBlocks(mistralPage: MistralOcrPage): MappedPage {
           // text block is body content (an enumerated item, a quoted entry) —
           // never let the legacy footnote check lift it out of the flow.
           const type = classified.type === "footnote" ? "body" : classified.type;
-          const block: Block = {
-            type,
-            reading_order: order++,
-            bbox,
-            level: classified.level,
-            lines: [{ text: classified.text }],
-          };
+          const block = makeBlock(type, [classified.text], classified.level);
           if (type === "body") bodyDensities.push({ block, density });
           blocks.push(block);
         }
