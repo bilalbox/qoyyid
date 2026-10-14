@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { setUserQuota, type AdminUser } from "$lib/admin-api";
+  import { setUserQuota, type AdminUser } from "#lib/admin-api";
   import { invalidateAll } from "$app/navigation";
   import type { PageProps } from "./$types";
 

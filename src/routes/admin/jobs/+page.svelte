@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { reproduceDocument, reproduceDocx, type AdminJob } from "$lib/admin-api";
+  import { reproduceDocument, reproduceDocx, type AdminJob } from "#lib/admin-api";
   import { invalidateAll } from "$app/navigation";
   import type { PageProps } from "./$types";
 

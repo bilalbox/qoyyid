@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { isTerminal } from "$lib/api";
+  import { isTerminal } from "#lib/api";
   import { invalidateAll } from "$app/navigation";
-  import JobStatus from "$lib/components/JobStatus.svelte";
+  import JobStatus from "#lib/components/JobStatus.svelte";
   import type { PageProps } from "./$types";
 
   let { data }: PageProps = $props();

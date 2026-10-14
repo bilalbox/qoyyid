@@ -1,4 +1,4 @@
-import { listAdminJobs } from "$lib/admin-api";
+import { listAdminJobs } from "#lib/admin-api";
 import type { PageLoad } from "./$types";
 
 export const ssr = false;

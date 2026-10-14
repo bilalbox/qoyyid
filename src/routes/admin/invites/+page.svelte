@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { createInvite, type AdminInvite } from "$lib/admin-api";
+  import { createInvite, type AdminInvite } from "#lib/admin-api";
   import { invalidateAll } from "$app/navigation";
   import type { PageProps } from "./$types";
 

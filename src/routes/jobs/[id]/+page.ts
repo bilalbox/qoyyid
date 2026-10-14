@@ -1,4 +1,4 @@
-import { getJob } from "$lib/api";
+import { getJob } from "#lib/api";
 import type { PageLoad } from "./$types";
 
 export const ssr = false;

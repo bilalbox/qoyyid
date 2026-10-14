@@ -3,7 +3,7 @@
   import { onMount } from "svelte";
   import { page } from "$app/state";
   import type { LayoutProps } from "./$types";
-  import { enableJobNotifications } from "$lib/notifications";
+  import { enableJobNotifications } from "#lib/notifications";
 
   let { children, data }: LayoutProps = $props();
 

@@ -1,5 +1,5 @@
 {
-  "extends": "./.svelte-kit/tsconfig.json",
+  "extends": "$app/tsconfig",
   "compilerOptions": {
     "target": "ES2022",
     "module": "ES2022",
@@ -9,7 +9,10 @@
     "noEmit": true,
     "skipLibCheck": true,
     "isolatedModules": true,
-    "types": []
+    "paths": {
+      "#lib/*": ["./src/lib/*"]
+    },
+    "types": ["$app/types"]
   },
   "include": [
     ".svelte-kit/ambient.d.ts",

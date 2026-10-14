@@ -1,4 +1,4 @@
-import { listJobs } from "$lib/api";
+import { listJobs } from "#lib/api";
 import type { PageLoad } from "./$types";
 
 export const ssr = false;

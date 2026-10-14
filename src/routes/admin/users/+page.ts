@@ -1,4 +1,4 @@
-import { listUsers } from "$lib/admin-api";
+import { listUsers } from "#lib/admin-api";
 import type { PageLoad } from "./$types";
 
 export const ssr = false;

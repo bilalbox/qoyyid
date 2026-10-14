@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Job } from "$lib/api";
+  import type { Job } from "#lib/api";
 
   let { job, hint = false }: { job: Job; hint?: boolean } = $props();
 
