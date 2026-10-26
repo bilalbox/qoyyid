@@ -3,11 +3,10 @@
 ## Local dev
 
 ```bash
-cd cloud
-npm install
-cp .env.example .env   # fill in MISTRAL_API_KEY, GOOGLE_CLIENT_ID/SECRET, ADMIN_EMAILS
-npm run db:migrate:local
-npm run dev
+pnpm install
+cp .env.example .env   # MISTRAL_API_KEY, GOOGLE_CLIENT_ID/SECRET, ADMIN_EMAILS, …
+pnpm db:migrate:local
+pnpm dev
 ```
 
 `wrangler dev` reads secrets from `.env` (or `-e/--env-file`) automatically.
@@ -20,35 +19,36 @@ costs real (small) money. Budget a handful of test pages.
 
 ## One-time setup
 
-1. Create remote R2 bucket `qoyyid-jobs` and D1 database `qoyyid-jobs` in the Cloudflare
-   dashboard (already done for this project — `database_id` is set in `wrangler.jsonc`).
+1. Create remote R2 bucket `qoyyid-assets` and D1 database `qoyyid-jobs` in the Cloudflare
+   dashboard (`database_id` is set in `wrangler.jsonc`).
 2. Apply migrations remotely:
 
 ```bash
-cd cloud
-npx wrangler d1 migrations apply qoyyid-jobs --remote
+pnpm db:migrate:remote
 ```
 
 3. Set production secrets from the same `.env` file, in one shot (do **not** commit
    `.env` — applies additively, safe to re-run, never deletes existing secrets):
 
 ```bash
-npx wrangler deploy --secrets-file=.env
+pnpm exec wrangler deploy --secrets-file=.env
 ```
 
    Or set them one at a time instead:
 
 ```bash
-npx wrangler secret put MISTRAL_API_KEY
-npx wrangler secret put GOOGLE_CLIENT_ID
-npx wrangler secret put GOOGLE_CLIENT_SECRET
-npx wrangler secret put ADMIN_EMAILS   # comma-separated list of admin emails
+pnpm exec wrangler secret put MISTRAL_API_KEY
+pnpm exec wrangler secret put GOOGLE_CLIENT_ID
+pnpm exec wrangler secret put GOOGLE_CLIENT_SECRET
+pnpm exec wrangler secret put ADMIN_EMAILS   # comma-separated list of admin emails
+pnpm exec wrangler secret put TURNSTILE_SECRET_KEY
+pnpm exec wrangler secret put FCM_SERVICE_ACCOUNT_JSON
 ```
 
 4. Deploy (if you didn't already via `--secrets-file` above):
 
 ```bash
-npx wrangler deploy
+pnpm deploy
 ```
 
 Worker URL: `https://qoyyid.23p.dev` (custom domain route, see `wrangler.jsonc`).
