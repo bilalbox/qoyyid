@@ -20,6 +20,7 @@
 		".svelte-kit/types/**/$types.d.ts",
 		"worker-configuration.d.ts",
 		"src/**/*.ts",
-		"src/**/*.svelte"
+		"src/**/*.svelte",
+		"tests/**/*.ts"
 	]
 }

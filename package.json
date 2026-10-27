@@ -12,15 +12,15 @@
 		"deploy": "vite build && wrangler deploy",
 		"db:migrate:local": "wrangler d1 migrations apply qoyyid-jobs --local",
 		"db:migrate:remote": "wrangler d1 migrations apply qoyyid-jobs --remote",
-		"typecheck": "tsc -b",
-		"test": "echo \"(no unit tests yet; vitest is a follow-up)\"",
+		"typecheck": "svelte-kit sync && tsc -b",
+		"test": "vitest run",
 		"lint": "biome check .",
 		"lint:graph": "tsx scripts/run-rev-dep.ts",
 		"lint:complexity": "tsx scripts/ratchets/run-complexity.ts",
 		"gate:fast": "pnpm lint && pnpm lint:graph && pnpm lint:complexity && pnpm typecheck",
 		"gate": "pnpm gate:fast && pnpm test",
 		"test:ratchets": "bash tests/ratchets/ratchet-contract.test.sh",
-		"prepare": "husky"
+		"prepare": "svelte-kit sync && husky"
 	},
 	"dependencies": {
 		"@aws-sdk/client-s3": "^3.1156.0",
@@ -53,6 +53,7 @@
 		"tsx": "^4.23.15",
 		"typescript": "npm:@typescript/typescript6@^6.0.2",
 		"vite": "^8.3.5",
+		"vitest": "^5.0.5",
 		"wrangler": "^4.152.0"
 	},
 	"packageManager": "pnpm@12.15.0",
