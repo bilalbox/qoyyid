@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1.0",
+  "canonicalFormVersion": "1.0",
+  "parameters": {
+    "blinding": "exact",
+    "blindIdentifiers": false,
+    "blindStrings": false,
+    "blindNumbers": false,
+    "minTokens": 50,
+    "minLines": 3,
+    "minDepth": 0,
+    "minStatements": 0,
+    "minDuplicates": 2,
+    "skipObjects": false,
+    "ignoreFiles": [
+      "scripts/**",
+      "tests/**",
+      "**/node_modules/**"
+    ],
+    "configLevelSettings": {
+      "configPath": "rev-dep.config.json",
+      "ignoreFiles": [
+        "**/node_modules/**",
+        "**/dist/**",
+        "**/.git/**",
+        "**/.wrangler/**",
+        "**/.svelte-kit/**",
+        "**/baselines/**",
+        "**/tests/ratchets/fixtures/**",
+        "**/static/**",
+        "**/worker-configuration.d.ts"
+      ]
+    }
+  },
+  "duplications": []
+}

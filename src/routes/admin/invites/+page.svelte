@@ -1,30 +1,30 @@
 <script lang="ts">
-  import { createInvite, type AdminInvite } from "#lib/admin-api";
-  import { invalidateAll } from "$app/navigation";
-  import type { PageProps } from "./$types";
+import { type AdminInvite, createInvite } from "#lib/admin-api";
+import { invalidateAll } from "$app/navigation";
+import type { PageProps } from "./$types";
 
-  let { data }: PageProps = $props();
+let { data }: PageProps = $props();
 
-  let invites = $derived(data.invites);
-  let email = $state("");
-  let creating = $state(false);
-  let error = $state<string | null>(null);
+let invites = $derived(data.invites);
+let email = $state("");
+let creating = $state(false);
+let error = $state<string | null>(null);
 
-  async function onCreate(e: SubmitEvent) {
-    e.preventDefault();
-    if (!email.trim()) return;
-    creating = true;
-    error = null;
-    try {
-      await createInvite(email.trim());
-      email = "";
-      await invalidateAll();
-    } catch (err) {
-      error = err instanceof Error ? err.message : String(err);
-    } finally {
-      creating = false;
-    }
-  }
+async function onCreate(e: SubmitEvent) {
+	e.preventDefault();
+	if (!email.trim()) return;
+	creating = true;
+	error = null;
+	try {
+		await createInvite(email.trim());
+		email = "";
+		await invalidateAll();
+	} catch (err) {
+		error = err instanceof Error ? err.message : String(err);
+	} finally {
+		creating = false;
+	}
+}
 </script>
 
 <svelte:head><title>الدعوات — إدارة قيد</title></svelte:head>

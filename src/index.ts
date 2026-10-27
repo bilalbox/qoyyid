@@ -1,22 +1,22 @@
 import { Hono } from "hono";
-import { createMiddleware } from "hono/factory";
 import { getCookie } from "hono/cookie";
-import type { Env } from "./types";
-import { json } from "./http";
-import { auth } from "./auth";
+import { createMiddleware } from "hono/factory";
 import { admin } from "./admin";
-import {
-  handleCreateAudioUpload,
-  handleCreateJob,
-  handleGetDocument,
-  handleGetDocx,
-  handleGetJob,
-  handleListJobs,
-  handleStartAudioJob,
-} from "./jobs";
-import { validateSessionToken } from "./users";
-import type { Session, User } from "./users";
+import { auth } from "./auth";
 import { pollPendingBatches } from "./cron";
+import { json } from "./http";
+import {
+	handleCreateAudioUpload,
+	handleCreateJob,
+	handleGetDocument,
+	handleGetDocx,
+	handleGetJob,
+	handleListJobs,
+	handleStartAudioJob,
+} from "./jobs";
+import type { Env } from "./types";
+import type { Session, User } from "./users";
+import { validateSessionToken } from "./users";
 
 type Variables = { user: User; session: Session };
 
@@ -25,23 +25,29 @@ type Variables = { user: User; session: Session };
 // matching the pattern used by /home/bilal/mycode/parse.
 const app = new Hono<{ Bindings: Env; Variables: Variables }>();
 
-const requireAuth = createMiddleware<{ Bindings: Env; Variables: Variables }>(async (c, next) => {
-  const sessionId = getCookie(c, "SESSION_ID") || c.req.header("Authorization")?.replace(/^Bearer\s+/i, "");
-  if (!sessionId) return json({ error: "unauthorized" }, 401);
-  const result = await validateSessionToken(c.env.DB, sessionId);
-  if (!result) return json({ error: "unauthorized" }, 401);
-  c.set("user", result.user);
-  c.set("session", result.session);
-  return next();
-});
+const requireAuth = createMiddleware<{ Bindings: Env; Variables: Variables }>(
+	async (c, next) => {
+		const sessionId =
+			getCookie(c, "SESSION_ID") ||
+			c.req.header("Authorization")?.replace(/^Bearer\s+/i, "");
+		if (!sessionId) return json({ error: "unauthorized" }, 401);
+		const result = await validateSessionToken(c.env.DB, sessionId);
+		if (!result) return json({ error: "unauthorized" }, 401);
+		c.set("user", result.user);
+		c.set("session", result.session);
+		return next();
+	},
+);
 
-const requireAdmin = createMiddleware<{ Bindings: Env; Variables: Variables }>(async (c, next) => {
-  const user = c.get("user");
-  if (!user?.is_admin) return json({ error: "forbidden" }, 403);
-  return next();
-});
+const requireAdmin = createMiddleware<{ Bindings: Env; Variables: Variables }>(
+	async (c, next) => {
+		const user = c.get("user");
+		if (!user?.is_admin) return json({ error: "forbidden" }, 403);
+		return next();
+	},
+);
 
-app.get("/health", (c) => json({ ok: true }));
+app.get("/health", (_c) => json({ ok: true }));
 
 app.route("/", auth);
 
@@ -52,46 +58,66 @@ app.use("/admin/*", requireAuth, requireAdmin);
 app.route("/", admin);
 
 app.get("/me", (c) => {
-  const { id, email, is_admin, quota_pages_limit, quota_pages_used, quota_minutes_limit, quota_minutes_used } = c.get("user");
-  return json({
-    id,
-    email,
-    is_admin: Boolean(is_admin),
-    quota_pages_limit,
-    quota_pages_used,
-    quota_minutes_limit,
-    quota_minutes_used,
-  });
+	const {
+		id,
+		email,
+		is_admin,
+		quota_pages_limit,
+		quota_pages_used,
+		quota_minutes_limit,
+		quota_minutes_used,
+	} = c.get("user");
+	return json({
+		id,
+		email,
+		is_admin: Boolean(is_admin),
+		quota_pages_limit,
+		quota_pages_used,
+		quota_minutes_limit,
+		quota_minutes_used,
+	});
 });
 
 app.post("/me/fcm-token", async (c) => {
-  const { token } = await c.req.json<{ token?: string }>().catch(() => ({ token: undefined }));
-  if (!token) return json({ error: "missing token" }, 400);
+	const { token } = await c.req
+		.json<{ token?: string }>()
+		.catch(() => ({ token: undefined }));
+	if (!token) return json({ error: "missing token" }, 400);
 
-  // Token is globally unique in FCM; re-registering under a new user (shared
-  // device, different Google account) should move it rather than conflict.
-  await c.env.DB.prepare(
-    `INSERT INTO fcm_tokens (token, user_id) VALUES (?, ?)
+	// Token is globally unique in FCM; re-registering under a new user (shared
+	// device, different Google account) should move it rather than conflict.
+	await c.env.DB.prepare(
+		`INSERT INTO fcm_tokens (token, user_id) VALUES (?, ?)
      ON CONFLICT(token) DO UPDATE SET user_id = excluded.user_id`,
-  )
-    .bind(token, c.get("user").id)
-    .run();
+	)
+		.bind(token, c.get("user").id)
+		.run();
 
-  return json({ success: true });
+	return json({ success: true });
 });
 
 app.delete("/me/fcm-token", async (c) => {
-  const { token } = await c.req.json<{ token?: string }>().catch(() => ({ token: undefined }));
-  if (!token) return json({ error: "missing token" }, 400);
-  await c.env.DB.prepare("DELETE FROM fcm_tokens WHERE token = ? AND user_id = ?")
-    .bind(token, c.get("user").id)
-    .run();
-  return json({ success: true });
+	const { token } = await c.req
+		.json<{ token?: string }>()
+		.catch(() => ({ token: undefined }));
+	if (!token) return json({ error: "missing token" }, 400);
+	await c.env.DB.prepare(
+		"DELETE FROM fcm_tokens WHERE token = ? AND user_id = ?",
+	)
+		.bind(token, c.get("user").id)
+		.run();
+	return json({ success: true });
 });
 
-app.post("/jobs", (c) => handleCreateJob(c.req.raw, c.env, c.executionCtx, c.get("user")));
-app.post("/jobs/audio-upload", (c) => handleCreateAudioUpload(c.req.raw, c.env, c.get("user")));
-app.post("/jobs/:id/start-audio", (c) => handleStartAudioJob(c.env, c.executionCtx, c.get("user"), c.req.param("id")));
+app.post("/jobs", (c) =>
+	handleCreateJob(c.req.raw, c.env, c.executionCtx, c.get("user")),
+);
+app.post("/jobs/audio-upload", (c) =>
+	handleCreateAudioUpload(c.req.raw, c.env, c.get("user")),
+);
+app.post("/jobs/:id/start-audio", (c) =>
+	handleStartAudioJob(c.env, c.executionCtx, c.get("user"), c.req.param("id")),
+);
 app.get("/jobs", (c) => handleListJobs(c.env, c.get("user")));
 // /jobs/:id is also the SvelteKit job-detail page's URL, and run_worker_first
 // routes that path here before the asset binding ever sees it. Browser
@@ -100,11 +126,16 @@ app.get("/jobs", (c) => handleListJobs(c.env, c.get("user")));
 // job data asks for JSON. Without this check every navigation here got the
 // raw JSON response instead of the HTML job page.
 app.get("/jobs/:id", (c) => {
-  if ((c.req.header("accept") ?? "").includes("text/html")) return c.env.ASSETS.fetch(c.req.raw);
-  return handleGetJob(c.env, c.get("user"), c.req.param("id"));
+	if ((c.req.header("accept") ?? "").includes("text/html"))
+		return c.env.ASSETS.fetch(c.req.raw);
+	return handleGetJob(c.env, c.get("user"), c.req.param("id"));
 });
-app.get("/jobs/:id/docx", (c) => handleGetDocx(c.env, c.get("user"), c.req.param("id")));
-app.get("/jobs/:id/document", (c) => handleGetDocument(c.env, c.get("user"), c.req.param("id")));
+app.get("/jobs/:id/docx", (c) =>
+	handleGetDocx(c.env, c.get("user"), c.req.param("id")),
+);
+app.get("/jobs/:id/document", (c) =>
+	handleGetDocument(c.env, c.get("user"), c.req.param("id")),
+);
 
 // /admin/* is in run_worker_first (see wrangler.jsonc), so this worker — not
 // the platform's SPA fallback — owns 404s under that prefix. Unmatched GETs
@@ -113,20 +144,31 @@ app.get("/jobs/:id/document", (c) => handleGetDocument(c.env, c.get("user"), c.r
 // serves index.html and the client router takes over. JSON API misses under
 // /admin/api/* still 404 as JSON.
 app.notFound((c) => {
-  const url = new URL(c.req.url);
-  if (c.req.method === "GET" && url.pathname.startsWith("/admin/") && !url.pathname.startsWith("/admin/api/")) {
-    return c.env.ASSETS.fetch(c.req.raw);
-  }
-  return json({ error: "not found" }, 404);
+	const url = new URL(c.req.url);
+	if (
+		c.req.method === "GET" &&
+		url.pathname.startsWith("/admin/") &&
+		!url.pathname.startsWith("/admin/api/")
+	) {
+		return c.env.ASSETS.fetch(c.req.raw);
+	}
+	return json({ error: "not found" }, 404);
 });
-app.onError((err, c) => {
-  console.error(err);
-  return json({ error: err instanceof Error ? err.message : "internal error" }, 500);
+app.onError((err, _c) => {
+	console.error(err);
+	return json(
+		{ error: err instanceof Error ? err.message : "internal error" },
+		500,
+	);
 });
 
 export default {
-  fetch: app.fetch,
-  async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
-    ctx.waitUntil(pollPendingBatches(env));
-  },
+	fetch: app.fetch,
+	async scheduled(
+		_event: ScheduledEvent,
+		env: Env,
+		ctx: ExecutionContext,
+	): Promise<void> {
+		ctx.waitUntil(pollPendingBatches(env));
+	},
 };

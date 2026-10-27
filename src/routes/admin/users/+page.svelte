@@ -1,36 +1,36 @@
 <script lang="ts">
-  import { setUserQuota, type AdminUser } from "#lib/admin-api";
-  import { invalidateAll } from "$app/navigation";
-  import type { PageProps } from "./$types";
+import { type AdminUser, setUserQuota } from "#lib/admin-api";
+import { invalidateAll } from "$app/navigation";
+import type { PageProps } from "./$types";
 
-  let { data }: PageProps = $props();
+let { data }: PageProps = $props();
 
-  let users = $derived(data.users);
-  let quotaDrafts = $state<Record<string, string>>({});
-  let saving = $state<string | null>(null);
-  let saveError = $state<string | null>(null);
+let users = $derived(data.users);
+let quotaDrafts = $state<Record<string, string>>({});
+let saving = $state<string | null>(null);
+let saveError = $state<string | null>(null);
 
-  function draftFor(user: AdminUser): string {
-    return quotaDrafts[user.id] ?? String(user.quota_pages_limit);
-  }
+function draftFor(user: AdminUser): string {
+	return quotaDrafts[user.id] ?? String(user.quota_pages_limit);
+}
 
-  async function saveQuota(user: AdminUser) {
-    const draft = Number(draftFor(user));
-    if (!Number.isFinite(draft) || draft < 0) {
-      saveError = `${user.email}: أدخل رقماً موجباً`;
-      return;
-    }
-    saving = user.id;
-    saveError = null;
-    try {
-      await setUserQuota(user.id, draft);
-      await invalidateAll();
-    } catch (err) {
-      saveError = err instanceof Error ? err.message : String(err);
-    } finally {
-      saving = null;
-    }
-  }
+async function saveQuota(user: AdminUser) {
+	const draft = Number(draftFor(user));
+	if (!Number.isFinite(draft) || draft < 0) {
+		saveError = `${user.email}: أدخل رقماً موجباً`;
+		return;
+	}
+	saving = user.id;
+	saveError = null;
+	try {
+		await setUserQuota(user.id, draft);
+		await invalidateAll();
+	} catch (err) {
+		saveError = err instanceof Error ? err.message : String(err);
+	} finally {
+		saving = null;
+	}
+}
 </script>
 
 <svelte:head><title>المستخدمون — إدارة قيد</title></svelte:head>

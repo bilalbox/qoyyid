@@ -1,46 +1,50 @@
 <script lang="ts">
-  import { page } from "$app/state";
+import { page } from "$app/state";
 
-  let error = $derived(page.url.searchParams.get("error"));
-  let turnstileToken = $state<string | null>(null);
-  let verifying = $state(false);
-  let verifyError = $state<string | null>(null);
+let error = $derived(page.url.searchParams.get("error"));
+let turnstileToken = $state<string | null>(null);
+let verifying = $state(false);
+let verifyError = $state<string | null>(null);
 
-  const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
+const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
 
-  // Exposed for the Turnstile widget's data-callback/data-error-callback.
-  if (typeof window !== "undefined") {
-    (window as any).onTurnstileSuccess = (token: string) => {
-      turnstileToken = token;
-    };
-    (window as any).onTurnstileExpired = () => {
-      turnstileToken = null;
-    };
-  }
+// Exposed for the Turnstile widget's data-callback/data-error-callback.
+if (typeof window !== "undefined") {
+	const win = window as Window & {
+		onTurnstileSuccess?: (token: string) => void;
+		onTurnstileExpired?: () => void;
+	};
+	win.onTurnstileSuccess = (token: string) => {
+		turnstileToken = token;
+	};
+	win.onTurnstileExpired = () => {
+		turnstileToken = null;
+	};
+}
 
-  async function signIn() {
-    if (!turnstileToken) return;
-    verifying = true;
-    verifyError = null;
-    try {
-      const res = await fetch("/auth/turnstile/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: turnstileToken }),
-      });
-      if (!res.ok) {
-        verifyError = "فشل التحقق. يرجى المحاولة مرة أخرى.";
-        turnstileToken = null;
-        return;
-      }
-      // /auth/google is a stateful redirect that mints a one-time OAuth state/verifier
-      // pair and overwrites cookies on every hit, so it's triggered via direct
-      // navigation only after the turnstile cookie is set — never preloaded.
-      window.location.href = "/auth/google";
-    } finally {
-      verifying = false;
-    }
-  }
+async function signIn() {
+	if (!turnstileToken) return;
+	verifying = true;
+	verifyError = null;
+	try {
+		const res = await fetch("/auth/turnstile/verify", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ token: turnstileToken }),
+		});
+		if (!res.ok) {
+			verifyError = "فشل التحقق. يرجى المحاولة مرة أخرى.";
+			turnstileToken = null;
+			return;
+		}
+		// /auth/google is a stateful redirect that mints a one-time OAuth state/verifier
+		// pair and overwrites cookies on every hit, so it's triggered via direct
+		// navigation only after the turnstile cookie is set — never preloaded.
+		window.location.href = "/auth/google";
+	} finally {
+		verifying = false;
+	}
+}
 </script>
 
 <svelte:head>

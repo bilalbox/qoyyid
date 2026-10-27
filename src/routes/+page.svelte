@@ -1,59 +1,59 @@
 <script lang="ts">
-  import { isTerminal, uploadJob } from "#lib/api";
-  import { invalidateAll } from "$app/navigation";
-  import JobStatus from "#lib/components/JobStatus.svelte";
-  import type { PageProps } from "./$types";
+import { isTerminal, uploadJob } from "#lib/api";
+import JobStatus from "#lib/components/JobStatus.svelte";
+import { invalidateAll } from "$app/navigation";
+import type { PageProps } from "./$types";
 
-  let { data }: PageProps = $props();
+let { data }: PageProps = $props();
 
-  let jobs = $derived(data.jobs);
-  let uploading = $state(false);
-  let uploadError = $state<string | null>(null);
-  let fileInput: HTMLInputElement | undefined = $state();
-  let fileName = $state<string | null>(null);
+let jobs = $derived(data.jobs);
+let uploading = $state(false);
+let uploadError = $state<string | null>(null);
+let fileInput: HTMLInputElement | undefined = $state();
+let fileName = $state<string | null>(null);
 
-  $effect(() => {
-    const pending = jobs.filter((j) => !isTerminal(j.status));
-    if (pending.length === 0) return;
+$effect(() => {
+	const pending = jobs.filter((j) => !isTerminal(j.status));
+	if (pending.length === 0) return;
 
-    const interval = setInterval(() => {
-      invalidateAll();
-    }, 5000);
+	const interval = setInterval(() => {
+		invalidateAll();
+	}, 5000);
 
-    return () => clearInterval(interval);
-  });
+	return () => clearInterval(interval);
+});
 
-  async function onUpload(e: SubmitEvent) {
-    e.preventDefault();
-    const file = fileInput?.files?.[0];
-    if (!file) return;
-    uploading = true;
-    uploadError = null;
-    try {
-      await uploadJob(file);
-      await invalidateAll();
-      if (fileInput) fileInput.value = "";
-      fileName = null;
-    } catch (err) {
-      uploadError = err instanceof Error ? err.message : String(err);
-    } finally {
-      uploading = false;
-    }
-  }
+async function onUpload(e: SubmitEvent) {
+	e.preventDefault();
+	const file = fileInput?.files?.[0];
+	if (!file) return;
+	uploading = true;
+	uploadError = null;
+	try {
+		await uploadJob(file);
+		await invalidateAll();
+		if (fileInput) fileInput.value = "";
+		fileName = null;
+	} catch (err) {
+		uploadError = err instanceof Error ? err.message : String(err);
+	} finally {
+		uploading = false;
+	}
+}
 
-  function onFileChange() {
-    fileName = fileInput?.files?.[0]?.name ?? null;
-  }
+function onFileChange() {
+	fileName = fileInput?.files?.[0]?.name ?? null;
+}
 
-  const relTime = new Intl.RelativeTimeFormat("ar", { numeric: "auto" });
-  function updatedAgo(iso: string): string {
-    const diffMs = new Date(iso).getTime() - Date.now();
-    const mins = Math.round(diffMs / 60000);
-    if (Math.abs(mins) < 60) return relTime.format(mins, "minute");
-    const hours = Math.round(mins / 60);
-    if (Math.abs(hours) < 24) return relTime.format(hours, "hour");
-    return relTime.format(Math.round(hours / 24), "day");
-  }
+const relTime = new Intl.RelativeTimeFormat("ar", { numeric: "auto" });
+function updatedAgo(iso: string): string {
+	const diffMs = new Date(iso).getTime() - Date.now();
+	const mins = Math.round(diffMs / 60000);
+	if (Math.abs(mins) < 60) return relTime.format(mins, "minute");
+	const hours = Math.round(mins / 60);
+	if (Math.abs(hours) < 24) return relTime.format(hours, "hour");
+	return relTime.format(Math.round(hours / 24), "day");
+}
 </script>
 
 <div class="mx-auto max-w-2xl space-y-12 px-6 py-12">

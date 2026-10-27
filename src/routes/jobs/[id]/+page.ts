@@ -4,6 +4,6 @@ import type { PageLoad } from "./$types";
 export const ssr = false;
 
 export const load: PageLoad = async ({ params }) => {
-  const job = await getJob(params.id);
-  return { job };
+	const job = await getJob(params.id);
+	return { job };
 };

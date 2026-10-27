@@ -56,7 +56,7 @@ System-browser OAuth + deep-link callback:
 
 ## Distribution
 
-**Sideload to start**, both platforms — direct APK download (Android), direct MSI/EXE (Windows). No Play Store / Microsoft Store initially. Tauri's self-hosted updater plugin wired up on both, chosen specifically because `youtubei.js` decipher breakage is a *when, not if* (same class of problem every YouTube-downloader tool faces) and store review queues would leave users broken for hours-to-days per incident. Store distribution can be added later once the app is stable; sideload-first avoids review entirely for now while the extraction logic is still finding its feet.
+**Sideload to start**, both platforms — direct APK download (Android), direct MSI/EXE (Windows). No Play Store / Microsoft Store initially. Tauri's self-hosted updater plugin wired up on both, chosen specifically because `youtubei.js` decipher breakage is a _when, not if_ (same class of problem every YouTube-downloader tool faces) and store review queues would leave users broken for hours-to-days per incident. Store distribution can be added later once the app is stable; sideload-first avoids review entirely for now while the extraction logic is still finding its feet.
 
 ## Deferred / not yet designed
 

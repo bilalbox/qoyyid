@@ -1,20 +1,23 @@
 export function json(data: unknown, status = 200): Response {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { "Content-Type": "application/json; charset=utf-8" },
-  });
+	return new Response(JSON.stringify(data), {
+		status,
+		headers: { "Content-Type": "application/json; charset=utf-8" },
+	});
 }
 
 export function jobKeys(jobId: string) {
-  const base = `jobs/${jobId}`;
-  return {
-    meta: `${base}/meta.json`,
-    mistralResponse: `${base}/mistral_response.json`,
-    document: `${base}/document.json`,
-    docx: `${base}/output.docx`,
-  };
+	const base = `jobs/${jobId}`;
+	return {
+		meta: `${base}/meta.json`,
+		mistralResponse: `${base}/mistral_response.json`,
+		document: `${base}/document.json`,
+		docx: `${base}/output.docx`,
+	};
 }
 
-export function uploadFileKey(sha256: string, extension: string = "pdf"): string {
-  return `uploads/${sha256}.${extension}`;
+export function uploadFileKey(
+	sha256: string,
+	extension: string = "pdf",
+): string {
+	return `uploads/${sha256}.${extension}`;
 }
