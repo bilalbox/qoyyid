@@ -34,7 +34,7 @@ pnpm db:migrate:remote
 pnpm exec wrangler deploy --secrets-file=.env
 ```
 
-   Or set them one at a time instead:
+Or set them one at a time instead:
 
 ```bash
 pnpm exec wrangler secret put MISTRAL_API_KEY

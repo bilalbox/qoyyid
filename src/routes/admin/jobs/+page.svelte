@@ -1,27 +1,31 @@
 <script lang="ts">
-  import { reproduceDocument, reproduceDocx, type AdminJob } from "#lib/admin-api";
-  import { invalidateAll } from "$app/navigation";
-  import type { PageProps } from "./$types";
+import {
+	type AdminJob,
+	reproduceDocument,
+	reproduceDocx,
+} from "#lib/admin-api";
+import { invalidateAll } from "$app/navigation";
+import type { PageProps } from "./$types";
 
-  let { data }: PageProps = $props();
+let { data }: PageProps = $props();
 
-  let jobs = $derived(data.jobs);
-  let busy = $state<string | null>(null);
-  let error = $state<string | null>(null);
+let jobs = $derived(data.jobs);
+let busy = $state<string | null>(null);
+let error = $state<string | null>(null);
 
-  async function run(action: "document" | "docx", job: AdminJob) {
-    busy = `${job.id}:${action}`;
-    error = null;
-    try {
-      if (action === "document") await reproduceDocument(job.id);
-      else await reproduceDocx(job.id);
-      await invalidateAll();
-    } catch (err) {
-      error = err instanceof Error ? err.message : String(err);
-    } finally {
-      busy = null;
-    }
-  }
+async function run(action: "document" | "docx", job: AdminJob) {
+	busy = `${job.id}:${action}`;
+	error = null;
+	try {
+		if (action === "document") await reproduceDocument(job.id);
+		else await reproduceDocx(job.id);
+		await invalidateAll();
+	} catch (err) {
+		error = err instanceof Error ? err.message : String(err);
+	} finally {
+		busy = null;
+	}
+}
 </script>
 
 <svelte:head><title>الطلبات — إدارة قيد</title></svelte:head>

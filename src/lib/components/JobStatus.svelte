@@ -1,17 +1,21 @@
 <script lang="ts">
-  import type { Job } from "#lib/api";
+import type { Job } from "#lib/api";
 
-  let { job, hint = false }: { job: Job; hint?: boolean } = $props();
+let { job, hint = false }: { job: Job; hint?: boolean } = $props();
 
-  const label = $derived.by(() => {
-    if (job.status === "done") return "مكتمل";
-    if (job.status === "failed") return "فشل";
-    if (job.status === "uploaded") return "مرفوع";
-    if (job.status === "batch_submitted" || job.status === "batch_running" || job.status === "mapping") {
-      return "قيد المعالجة";
-    }
-    return job.status;
-  });
+const label = $derived.by(() => {
+	if (job.status === "done") return "مكتمل";
+	if (job.status === "failed") return "فشل";
+	if (job.status === "uploaded") return "مرفوع";
+	if (
+		job.status === "batch_submitted" ||
+		job.status === "batch_running" ||
+		job.status === "mapping"
+	) {
+		return "قيد المعالجة";
+	}
+	return job.status;
+});
 </script>
 
 {#if job.status === "done"}

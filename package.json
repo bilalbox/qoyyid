@@ -1,46 +1,67 @@
 {
-  "name": "qoyyid",
-  "private": true,
-  "version": "0.1.0",
-  "type": "module",
-  "imports": {
-    "#lib/*": "./src/lib/*"
-  },
-  "scripts": {
-    "dev": "wrangler dev --port 8787",
-    "build": "vite build",
-    "deploy": "vite build && wrangler deploy",
-    "db:migrate:local": "wrangler d1 migrations apply qoyyid-jobs --local",
-    "db:migrate:remote": "wrangler d1 migrations apply qoyyid-jobs --remote",
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@aws-sdk/client-s3": "^3.1150.0",
-    "@aws-sdk/s3-request-presigner": "^3.1150.0",
-    "@oslojs/encoding": "^1.1.0",
-    "arctic": "^3.7.0",
-    "docx": "^9.10.0",
-    "firebase": "^13.0.0",
-    "hono": "^4.13.13"
-  },
-  "devDependencies": {
-    "@fontsource-variable/vazirmatn": "^5.3.0",
-    "@fontsource/ibm-plex-mono": "^5.3.0",
-    "@fontsource/reem-kufi": "^5.3.0",
-    "@skeletonlabs/skeleton": "^5.0.1",
-    "@skeletonlabs/skeleton-svelte": "^5.0.1",
-    "@sveltejs/adapter-static": "^4.0.0",
-    "@sveltejs/kit": "^3.0.1",
-    "@sveltejs/vite-plugin-svelte": "^7.3.1",
-    "@tailwindcss/vite": "^4.3.3",
-    "@types/node": "^26.6.5",
-    "@typescript/native": "npm:typescript@^7.0.2",
-    "svelte": "^5.57.2",
-    "svelte-check": "^4.7.6",
-    "tailwindcss": "^4.3.3",
-    "typescript": "npm:@typescript/typescript6@^6.0.2",
-    "vite": "^8.3.4",
-    "wrangler": "^4.150.0"
-  },
-  "packageManager": "pnpm@12.13.0+sha512.1e55719bf26e809dce5c5084fdebaa64efb3da9038ae5d68a9f8a68311f1a45841c8c3b76a37298c3b66f6bcc80409a9b7f33c78a7168a3e90fb65a5d8235ae4"
+	"name": "qoyyid",
+	"private": true,
+	"version": "0.1.0",
+	"type": "module",
+	"imports": {
+		"#lib/*": "./src/lib/*"
+	},
+	"scripts": {
+		"dev": "wrangler dev --port 8787",
+		"build": "vite build",
+		"deploy": "vite build && wrangler deploy",
+		"db:migrate:local": "wrangler d1 migrations apply qoyyid-jobs --local",
+		"db:migrate:remote": "wrangler d1 migrations apply qoyyid-jobs --remote",
+		"typecheck": "tsc -b",
+		"test": "echo \"(no unit tests yet; vitest is a follow-up)\"",
+		"lint": "biome check .",
+		"lint:graph": "tsx scripts/run-rev-dep.ts",
+		"lint:complexity": "tsx scripts/ratchets/run-complexity.ts",
+		"gate:fast": "pnpm lint && pnpm lint:graph && pnpm lint:complexity && pnpm typecheck",
+		"gate": "pnpm gate:fast && pnpm test",
+		"test:ratchets": "bash tests/ratchets/ratchet-contract.test.sh",
+		"prepare": "husky"
+	},
+	"dependencies": {
+		"@aws-sdk/client-s3": "^3.1156.0",
+		"@aws-sdk/s3-request-presigner": "^3.1156.0",
+		"@oslojs/encoding": "^1.1.0",
+		"arctic": "^3.7.0",
+		"docx": "^9.14.0",
+		"firebase": "^13.1.0",
+		"hono": "^4.13.14"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.6.3",
+		"@fontsource-variable/vazirmatn": "^5.3.0",
+		"@fontsource/ibm-plex-mono": "^5.3.0",
+		"@fontsource/reem-kufi": "^5.3.0",
+		"@skeletonlabs/skeleton": "^5.0.1",
+		"@skeletonlabs/skeleton-svelte": "^5.0.1",
+		"@sveltejs/adapter-static": "^4.0.0",
+		"@sveltejs/kit": "^3.1.0",
+		"@sveltejs/vite-plugin-svelte": "^7.3.1",
+		"@tailwindcss/vite": "^4.3.3",
+		"@types/node": "^26.6.5",
+		"@typescript/native": "npm:typescript@^7.0.2",
+		"husky": "^9.1.7",
+		"lint-staged": "^17.6.0",
+		"rev-dep": "^3.3.0",
+		"svelte": "^5.57.2",
+		"svelte-check": "^4.7.7",
+		"tailwindcss": "^4.3.3",
+		"tsx": "^4.23.15",
+		"typescript": "npm:@typescript/typescript6@^6.0.2",
+		"vite": "^8.3.5",
+		"wrangler": "^4.152.0"
+	},
+	"packageManager": "pnpm@12.15.0",
+	"lint-staged": {
+		"*.{js,ts,cjs,mjs,d.cts,d.mts,jsx,tsx,json,jsonc}": [
+			"biome check --write --no-errors-on-unmatched"
+		]
+	},
+	"engines": {
+		"node": ">=24.0.0 <25"
+	}
 }

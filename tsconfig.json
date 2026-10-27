@@ -1,25 +1,25 @@
 {
-  "extends": "$app/tsconfig",
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "ES2022",
-    "moduleResolution": "Bundler",
-    "resolveJsonModule": true,
-    "strict": true,
-    "noEmit": true,
-    "skipLibCheck": true,
-    "isolatedModules": true,
-    "paths": {
-      "#lib/*": ["./src/lib/*"]
-    },
-    "types": ["$app/types"]
-  },
-  "include": [
-    ".svelte-kit/ambient.d.ts",
-    ".svelte-kit/non-ambient.d.ts",
-    ".svelte-kit/types/**/$types.d.ts",
-    "worker-configuration.d.ts",
-    "src/**/*.ts",
-    "src/**/*.svelte"
-  ]
+	"extends": ["$app/tsconfig", "./tsconfig.base.json"],
+	"compilerOptions": {
+		"target": "ES2022",
+		"module": "ES2022",
+		"moduleResolution": "Bundler",
+		"resolveJsonModule": true,
+		"strict": true,
+		"noEmit": true,
+		"skipLibCheck": true,
+		"isolatedModules": true,
+		"paths": {
+			"#lib/*": ["./src/lib/*"]
+		},
+		"types": ["$app/types"]
+	},
+	"include": [
+		".svelte-kit/ambient.d.ts",
+		".svelte-kit/non-ambient.d.ts",
+		".svelte-kit/types/**/$types.d.ts",
+		"worker-configuration.d.ts",
+		"src/**/*.ts",
+		"src/**/*.svelte"
+	]
 }

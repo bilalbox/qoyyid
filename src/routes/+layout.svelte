@@ -1,22 +1,22 @@
 <script lang="ts">
-  import "../app.css";
-  import { onMount } from "svelte";
-  import { page } from "$app/state";
-  import type { LayoutProps } from "./$types";
-  import { enableJobNotifications } from "#lib/notifications";
+import "../app.css";
+import { onMount } from "svelte";
+import { enableJobNotifications } from "#lib/notifications";
+import { page } from "$app/state";
+import type { LayoutProps } from "./$types";
 
-  let { children, data }: LayoutProps = $props();
+let { children, data }: LayoutProps = $props();
 
-  onMount(() => {
-    if (data.me) enableJobNotifications();
-  });
+onMount(() => {
+	if (data.me) enableJobNotifications();
+});
 
-  async function signOut() {
-    await fetch("/auth/logout", { method: "POST" });
-    window.location.href = "/login";
-  }
+async function signOut() {
+	await fetch("/auth/logout", { method: "POST" });
+	window.location.href = "/login";
+}
 
-  let onAdminRoute = $derived(page.url.pathname.startsWith("/admin"));
+let onAdminRoute = $derived(page.url.pathname.startsWith("/admin"));
 </script>
 
 {#if data.me}

@@ -1,14 +1,14 @@
 <script lang="ts">
-  import { page } from "$app/state";
-  import type { LayoutProps } from "./$types";
+import { page } from "$app/state";
+import type { LayoutProps } from "./$types";
 
-  let { children }: LayoutProps = $props();
+let { children }: LayoutProps = $props();
 
-  const tabs = [
-    { href: "/admin/users", label: "المستخدمون" },
-    { href: "/admin/invites", label: "الدعوات" },
-    { href: "/admin/jobs", label: "الطلبات" },
-  ];
+const tabs = [
+	{ href: "/admin/users", label: "المستخدمون" },
+	{ href: "/admin/invites", label: "الدعوات" },
+	{ href: "/admin/jobs", label: "الطلبات" },
+];
 </script>
 
 <div class="mx-auto max-w-5xl px-6 py-12">

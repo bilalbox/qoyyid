@@ -1,0 +1,139 @@
+{
+  "schemaVersion": "1.0",
+  "workspaces": {
+    ".": {
+      "dev-deps-usage-on-prod": [
+        {
+          "file": "src/routes/+layout.svelte",
+          "module": "svelte"
+        },
+        {
+          "file": "src/routes/admin/+layout.ts",
+          "module": "@sveltejs/kit"
+        }
+      ],
+      "unresolved-imports": [
+        {
+          "file": "src/routes/+layout.svelte",
+          "request": "$app/state",
+          "kind": "literal"
+        },
+        {
+          "file": "src/routes/+layout.svelte",
+          "request": "./$types",
+          "kind": "literal"
+        },
+        {
+          "file": "src/routes/+layout.ts",
+          "request": "./$types",
+          "kind": "literal"
+        },
+        {
+          "file": "src/routes/+page.svelte",
+          "request": "$app/navigation",
+          "kind": "literal"
+        },
+        {
+          "file": "src/routes/+page.svelte",
+          "request": "./$types",
+          "kind": "literal"
+        },
+        {
+          "file": "src/routes/+page.ts",
+          "request": "./$types",
+          "kind": "literal"
+        },
+        {
+          "file": "src/routes/admin/+layout.svelte",
+          "request": "$app/state",
+          "kind": "literal"
+        },
+        {
+          "file": "src/routes/admin/+layout.svelte",
+          "request": "./$types",
+          "kind": "literal"
+        },
+        {
+          "file": "src/routes/admin/+layout.ts",
+          "request": "./$types",
+          "kind": "literal"
+        },
+        {
+          "file": "src/routes/admin/invites/+page.svelte",
+          "request": "$app/navigation",
+          "kind": "literal"
+        },
+        {
+          "file": "src/routes/admin/invites/+page.svelte",
+          "request": "./$types",
+          "kind": "literal"
+        },
+        {
+          "file": "src/routes/admin/invites/+page.ts",
+          "request": "./$types",
+          "kind": "literal"
+        },
+        {
+          "file": "src/routes/admin/jobs/+page.svelte",
+          "request": "$app/navigation",
+          "kind": "literal"
+        },
+        {
+          "file": "src/routes/admin/jobs/+page.svelte",
+          "request": "./$types",
+          "kind": "literal"
+        },
+        {
+          "file": "src/routes/admin/jobs/+page.ts",
+          "request": "./$types",
+          "kind": "literal"
+        },
+        {
+          "file": "src/routes/admin/users/+page.svelte",
+          "request": "$app/navigation",
+          "kind": "literal"
+        },
+        {
+          "file": "src/routes/admin/users/+page.svelte",
+          "request": "./$types",
+          "kind": "literal"
+        },
+        {
+          "file": "src/routes/admin/users/+page.ts",
+          "request": "./$types",
+          "kind": "literal"
+        },
+        {
+          "file": "src/routes/jobs/[id]/+page.svelte",
+          "request": "$app/navigation",
+          "kind": "literal"
+        },
+        {
+          "file": "src/routes/jobs/[id]/+page.svelte",
+          "request": "./$types",
+          "kind": "literal"
+        },
+        {
+          "file": "src/routes/jobs/[id]/+page.ts",
+          "request": "./$types",
+          "kind": "literal"
+        },
+        {
+          "file": "src/routes/login/+page.svelte",
+          "request": "$app/state",
+          "kind": "literal"
+        }
+      ],
+      "unused-node-modules": [
+        {
+          "module": "svelte-check",
+          "packageJson": "package.json"
+        },
+        {
+          "module": "typescript",
+          "packageJson": "package.json"
+        }
+      ]
+    }
+  }
+}

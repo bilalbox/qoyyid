@@ -1,19 +1,19 @@
 <script lang="ts">
-  import { isTerminal } from "#lib/api";
-  import { invalidateAll } from "$app/navigation";
-  import JobStatus from "#lib/components/JobStatus.svelte";
-  import type { PageProps } from "./$types";
+import { isTerminal } from "#lib/api";
+import JobStatus from "#lib/components/JobStatus.svelte";
+import { invalidateAll } from "$app/navigation";
+import type { PageProps } from "./$types";
 
-  let { data }: PageProps = $props();
-  let job = $derived(data.job);
+let { data }: PageProps = $props();
+let job = $derived(data.job);
 
-  $effect(() => {
-    if (isTerminal(job.status)) return;
-    const interval = setInterval(() => {
-      invalidateAll();
-    }, 5000);
-    return () => clearInterval(interval);
-  });
+$effect(() => {
+	if (isTerminal(job.status)) return;
+	const interval = setInterval(() => {
+		invalidateAll();
+	}, 5000);
+	return () => clearInterval(interval);
+});
 </script>
 
 <div class="mx-auto max-w-2xl px-6 py-12">
